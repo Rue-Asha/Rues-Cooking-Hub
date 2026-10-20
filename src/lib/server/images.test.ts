@@ -22,10 +22,11 @@ function imageRows(): number {
 	return Number(getDb().prepare('SELECT count(*) AS n FROM images').get()?.n);
 }
 
-// noise compresses badly, so this stays well above 200 KB until it is downscaled
+// noise compresses badly, so this stays above 200 KB until it is downscaled; heavy noise made the
+// downscale loop too slow for a one-core CI runner
 function photo(width: number, height: number): Promise<Uint8Array> {
 	return sharp({
-		create: { width, height, channels: 3, background: '#808080', noise: { type: 'gaussian', mean: 128, sigma: 40 } }
+		create: { width, height, channels: 3, background: '#808080', noise: { type: 'gaussian', mean: 128, sigma: 12 } }
 	})
 		.jpeg({ quality: 92 })
 		.toBuffer();
@@ -40,7 +41,7 @@ async function rejection(p: Promise<unknown>): Promise<unknown> {
 
 describe('storeImage', () => {
 	it('Scenario: Uploaded image is stored downscaled', async () => {
-		const input = await photo(3000, 2000);
+		const input = await photo(1800, 1200);
 		expect(input.length).toBeGreaterThan(TARGET_BYTES);
 
 		const id = await storeImage(input);
@@ -100,7 +101,7 @@ describe('storeImageFromUrl', () => {
 	let jpeg: Uint8Array;
 
 	beforeAll(async () => {
-		jpeg = await photo(2400, 1600);
+		jpeg = await photo(1800, 1200);
 		server = createServer((req, res) => {
 			if (req.url === '/photo.jpg') {
 				res.writeHead(200, { 'content-type': 'image/jpeg' }).end(jpeg);
