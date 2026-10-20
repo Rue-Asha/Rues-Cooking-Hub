@@ -1,0 +1,11 @@
+Mockup photos for /__mockups (design reference only). Downloaded once on 2026-10-19 via the Openverse catalogue.
+Format: file | source URL | author: name | licence: name (URL)
+
+pumpkin-soup.jpg | https://www.rawpixel.com/image/432999/pumpkin-soup | author: Markus Spiske | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+ricotta-pancakes.jpg | https://stocksnap.io/photo/pancake-raspberry-6OWCQIHAAL | author: Piotr Chrobot | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+village-salad.jpg | https://stocksnap.io/photo/salad-tomato-6ZXVEBYMAM | author: Lisa Fotios | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+sourdough.jpg | https://stocksnap.io/photo/baking-bread-XXNL0MZLOR | author: Igor Trepeshchenok | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+penne-arrabbiata.jpg | https://stocksnap.io/photo/vegan-pasta-KRX6BEOKGM | author: Burst | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+spaghetti-pomodoro.jpg | https://stocksnap.io/photo/pasta-tomato-PF8WHPHNGH | author: Jamie Hamel-Smith | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+yoghurt-bowl.jpg | https://stocksnap.io/photo/breakfast-bowl-V9AOG26R2W | author: JESHOOTS.com | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+lentil-soup.jpg | https://stocksnap.io/photo/bowl-soup-WOZ7PQGMMI | author: Foodie Girl | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)

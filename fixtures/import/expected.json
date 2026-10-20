@@ -1,0 +1,107 @@
+{
+	"butter-chicken.html": {
+		"url": "https://www.recipetineats.com/butter-chicken/",
+		"fetched": "2026-10-19",
+		"jsonLd": "@graph",
+		"title": "Butter Chicken",
+		"servings": 3,
+		"prepMinutes": 10,
+		"cookMinutes": 25,
+		"imageUrl": "https://www.recipetineats.com/tachyon/2019/01/Butter-Chicken_5-SQ.jpg",
+		"tagNames": [
+			"Chicken",
+			"Curry",
+			"Butter Chicken"
+		],
+		"ingredients": 17,
+		"steps": 7
+	},
+	"chocolate-chip-cookies.html": {
+		"url": "https://www.allrecipes.com/recipe/10813/best-chocolate-chip-cookies/",
+		"fetched": "2026-10-19",
+		"jsonLd": "array",
+		"title": "Best Chocolate Chip Cookies",
+		"servings": 48,
+		"prepMinutes": 20,
+		"cookMinutes": 10,
+		"imageUrl": "https://www.allrecipes.com/thmb/8xwaWAHtl_QLij6D-G0Z4B1HDVA=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/10813-best-chocolate-chip-cookies-mfs-146-4x3-b108aceffa6043a1ac81c3c5a9b034c8.jpg",
+		"tagNames": [
+			"Dessert",
+			"publisher-tested"
+		],
+		"ingredients": 11,
+		"steps": 9
+	},
+	"easy-pancakes.html": {
+		"url": "https://www.bbcgoodfood.com/recipes/easy-pancakes",
+		"fetched": "2026-10-19",
+		"jsonLd": "plain",
+		"title": "Easy pancakes",
+		"servings": 12,
+		"prepMinutes": 10,
+		"cookMinutes": 20,
+		"imageUrl": "https://images.immediate.co.uk/production/volatile/sites/30/2020/08/recipe-image-legacy-id-1273477_8-ad36e3b.jpg?resize=440,400",
+		"tagNames": [
+			"Breakfast",
+			"Brunch",
+			"Main course",
+			"Cassie Best",
+			"Cook school",
+			"Crepe",
+			"Crêpes",
+			"easy pancakes",
+			"Flip",
+			"Flipping",
+			"healthy pancakes",
+			"How to make pancakes",
+			"Make ahead",
+			"Pancake day",
+			"Pancake filling",
+			"Shrove Tuesday",
+			"Skills",
+			"thin pancakes"
+		],
+		"ingredients": 6,
+		"steps": 5
+	},
+	"guacamole.html": {
+		"url": "https://www.simplyrecipes.com/recipes/perfect_guacamole/",
+		"fetched": "2026-10-19",
+		"jsonLd": "array",
+		"title": "How to Make the Best Guacamole",
+		"servings": 4,
+		"prepMinutes": 10,
+		"cookMinutes": null,
+		"imageUrl": "https://www.simplyrecipes.com/thmb/J4kA2m6jKMgkQwZhG-RYpjZBeFQ=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/Guacamole-LEAD-6-2-64cfcca253c8421dad4e3fad830219f6.jpg",
+		"tagNames": [
+			"Appetizer",
+			"Side Dish",
+			"Snack",
+			"Condiment",
+			"Dip",
+			"Quick and Easy",
+			"Restaurant Favorite",
+			"Avocado",
+			"Guacamole",
+			"Mexican",
+			"Super Bowl",
+			"TexMex",
+			"Gluten-Free",
+			"Low Carb",
+			"Paleo",
+			"Vegan",
+			"Vegetarian",
+			"Favorite Summer",
+			"Game Day"
+		],
+		"ingredients": 10,
+		"steps": 5
+	},
+	"no-recipe.html": {
+		"url": "https://www.eat-this.org/",
+		"fetched": "2026-10-19",
+		"jsonLd": null,
+		"title": "Eat this! – Vegane Rezepte mit Herz seit 2011",
+		"imageUrl": "https://www.eat-this.org/wp-content/uploads/2022/09/Eat-this-Team-Nadine-Horn-und-Joerg-Mayer-700x700.jpg"
+	}
+}

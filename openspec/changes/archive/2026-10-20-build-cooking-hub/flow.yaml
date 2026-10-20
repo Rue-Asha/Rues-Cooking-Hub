@@ -1,0 +1,19 @@
+track: feature
+triage: 'feature — new app "Rues Cooking Hub" (recipe archive with URL import, weekly meal plan, shopping list, home dashboard) in a new repo, with harness, CI and release like Rues-Arcade. Appetite: a few sessions (~1 week).'
+base: main
+gate0: 2026-10-19
+gate1: 2026-10-19
+gate2: 2026-10-20
+learnings:
+  - 'Explore questions → ask them with AskUserQuestion (options + free text), max 4 per call, not as a numbered list in prose. (weil: Rue asked for that format after the first round of 8 prose questions)'
+  - 'Planner on apps with photo-led design (hero, cards, bento) → settle the mockup photo source (own photos vs free-licence download) at explore. (weil: build-cooking-hub planner returned needs-human on mockup photos; without photos the vibe could not be judged)'
+  - 'Planner on a contract unit whose test/seed routes call a function a later unit implements (nameKey) → give the stub a usable default or put the route in the implementing unit. (weil: U2 wrapped the stub call in a try/catch fallback that U5 then had to remove outside its file list)'
+  - 'Builder briefs allowing a one-time fixture download → name the candidate URLs (or a cap like 10 fetches) and say a missing shape is covered synthetically. (weil: U7 fetched ~30 pages hunting a HowToSection, the permission classifier then blocked further fetches as exfil scouting)'
+  - 'Parallel builders and the session scratchpad → give each builder its own scratchpad subdir (scratchpad/<unit>/) in the brief. (weil: U6 proof log overwrote U4 scratchpad/proof.log)'
+  - 'Design unit allowed a photo download → name the source (e.g. a CC0 catalogue) and allow its search calls explicitly, or the builder exceeds "two downloads". (weil: U4 needed ~10 Openverse searches + 22 thumbnails to find credited CC0 photos)'
+  - 'UI builder e2e scenarios → watch the e2e test fail against the missing UI, not only the unit tests, and name a per-unit port for screenshot servers. (weil: U11 wrote 11.3/11.4 e2e first but only ran unit tests red; port 4712 was taken by another unit screenshot server)'
+  - 'UI builders using Svelte outro transitions on menus/forms/sheets → set aria-hidden on outrostart (Svelte only sets inert) and run a new e2e file with --repeat-each before committing. (weil: plan-entries "Edit and delete an entry" failed 6/10 on phone from a strict-mode duplicate Save during a 160 ms outro; U13 committed it green by luck, the wave merge caught it)'
+  - 'Builder proof in the background → the brief gives the exact command `npm run proof:full > log 2>&1 && echo ok || echo FAIL` plus `rg -c ✘ log`, not just "chain with &&". (weil: U15 committed 15.4 on a red run after `…; echo exit=$?` printed 0; the same plan-entries flake two units hit)'
+  - 'Orchestrator after merging a unit that adds deps → run npm ci in the main checkout before proof:full. (weil: first proof after U15 was red on a missing markdown-it, not on code)'
+  - 'After a fixer round that changes code beyond the named findings → run a reviewer scoped to the fix commits before Gate 2. (weil: fixer r1 moved the Week ring to a ::after pseudo, which on desktop (.slots display:contents) drew around the whole today column; proof:full was green, only the scoped review found it)'
+  - 'Fixer/verifier briefs with proof:full near the 590 s Bash cap → say: run it with run_in_background and wait with a bounded `timeout 150 tail -f /dev/null` (foreground sleep is blocked). (weil: proof:full takes ~5 min; a 280 s wait was killed with exit 137 while the proof kept running)'
