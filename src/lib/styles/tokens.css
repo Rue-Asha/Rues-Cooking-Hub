@@ -1,0 +1,108 @@
+/* Every colour, radius, shadow, blur, spacing step, duration and easing. Colour values are mirrored in tokens.ts. */
+:root {
+	color-scheme: light;
+
+	--ground: #F4EFE6;
+	--sand: #E8DFD0;
+	--surface: #FBF8F2;
+	--line: #DDD3C2;
+	--stone: #8A847A;
+	--ink: #2B2723;
+	--ink-2: #5C564E;
+	--olive: #55633F;
+	--olive-soft: #E4E7D6;
+	--brick: #AC3F2C;
+	--brick-soft: #F3DED7;
+	--dark: #2A2724;
+	--on-dark: #F4EFE6;
+	--white: #FFFFFF;
+
+	--glass: rgb(251 248 242 / 0.72);
+	--glass-strong: rgb(251 248 242 / 0.86);
+	--glass-border: rgb(255 255 255 / 0.55);
+	--glass-blur: 18px;
+	--glass-filter: blur(var(--glass-blur)) saturate(1.2);
+	--glass-on-dark: rgb(244 239 230 / 0.14);
+	--scrim-end: rgb(20 16 12 / 0.55);
+	--scrim-clear: rgb(20 16 12 / 0);
+	--scrim-top: rgb(20 16 12 / 0.28);
+	--scrim: linear-gradient(180deg, var(--scrim-clear) 35%, var(--scrim-end) 100%);
+	--backdrop: rgb(20 16 12 / 0.42);
+	--veil: rgb(43 39 35 / 0.18);
+	--veil-strong: rgb(43 39 35 / 0.38);
+	--line-on-dark: rgb(244 239 230 / 0.22);
+	--line-on-photo: rgb(255 255 255 / 0.4);
+	--ink-wash: rgb(43 39 35 / 0.06);
+	--olive-wash: rgb(85 99 63 / 0.12);
+	--brick-wash: rgb(172 63 44 / 0.1);
+
+	--shadow-float: 0 18px 40px -18px rgb(43 39 35 / 0.35), 0 2px 6px rgb(43 39 35 / 0.06);
+	--shadow-card: 0 1px 2px rgb(43 39 35 / 0.06), 0 10px 28px -16px rgb(43 39 35 / 0.28);
+	--shadow-lift: 0 28px 60px -24px rgb(43 39 35 / 0.45);
+	--focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--olive);
+
+	--r-xs: 8px;
+	--r-sm: 14px;
+	--r-md: 18px;
+	--r-card: 24px;
+	--r-panel: 28px;
+	--r-frame: 36px;
+	--r-pill: 999px;
+
+	--s-1: 4px;
+	--s-2: 8px;
+	--s-3: 12px;
+	--s-4: 16px;
+	--s-5: 20px;
+	--s-6: 24px;
+	--s-7: 32px;
+	--s-8: 40px;
+	--s-9: 56px;
+	--s-10: 72px;
+	--s-11: 96px;
+
+	--col-max: 1200px;
+	--gutter: 16px;
+	--nav-h: 64px;
+	--tabbar-h: 68px;
+
+	--font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+	--font-text: 'DM Sans', system-ui, sans-serif;
+	--t-display-1: 40px;
+	--t-display-2: 32px;
+	--t-display-3: 26px;
+	--t-title: 18px;
+	--t-body: 16px;
+	--t-small: 13px;
+	--t-kicker: 11px;
+	--tracking-kicker: 0.2em;
+
+	--d-instant: 0ms;
+	--d-fast: 160ms;
+	--d-base: 280ms;
+	--d-slow: 480ms;
+	--d-nudge: 640ms;
+	--d-loop: 1000ms;
+	--d-sweep: 1300ms;
+	--d-ambient: 6000ms;
+	--ease-out: cubic-bezier(0.22, 0.8, 0.24, 1);
+	--ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+	--ease-linear: linear;
+	--ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+	--ease-glide: cubic-bezier(0.3, 1.2, 0.4, 1);
+}
+
+@media (min-width: 768px) {
+	:root {
+		--gutter: 32px;
+	}
+}
+
+@media (min-width: 1024px) {
+	:root {
+		--t-display-1: 56px;
+		--t-display-2: 40px;
+		--t-display-3: 32px;
+		--t-kicker: 12px;
+	}
+}
