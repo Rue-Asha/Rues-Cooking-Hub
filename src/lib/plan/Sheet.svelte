@@ -37,6 +37,7 @@
 	bind:this={dialog}
 	aria-label={label}
 	data-closing={closing ? '' : undefined}
+	aria-hidden={closing ? 'true' : undefined}
 	oncancel={(e) => {
 		e.preventDefault();
 		onclose();

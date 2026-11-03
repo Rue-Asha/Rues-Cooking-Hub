@@ -83,6 +83,8 @@ export function resetDb(): void {
 		DELETE FROM plan_entries;
 		DELETE FROM shopping_items;
 		DELETE FROM category_memory;
+		DELETE FROM spots;
+		DELETE FROM spot_tags;
 		DELETE FROM recipes;
 		DELETE FROM images;
 		DELETE FROM tags;

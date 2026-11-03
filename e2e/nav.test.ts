@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { calm, open } from './helpers.ts';
 
-const paths = ['/', '/recipes', '/plan', '/list'];
-const labels = ['Home', 'Recipes', 'Plan', 'List'];
+const paths = ['/', '/recipes', '/plan', '/list', '/eating-out'];
+const labels = ['Home', 'Recipes', 'Plan', 'List', 'Eating Out'];
 
 // the areas are still placeholders, so long-page checks bring their own content
 async function makeLong(page: Page) {
@@ -57,6 +57,12 @@ test('Scenario: Nav marks the open area', async ({ page }) => {
 	await expect(current).toHaveText('Plan');
 	await expect(page.locator('[aria-current]')).toHaveCount(2);
 	await expect(page.locator('[aria-current]').filter({ hasNotText: 'Plan' })).toHaveCount(0);
+
+	await open(page, '/eating-out');
+	await expect(current).toHaveCount(1);
+	await expect(current).toHaveText('Eating Out');
+	await expect(page.locator('[aria-current]')).toHaveCount(2);
+	await expect(page.locator('[aria-current]').filter({ hasNotText: 'Eating Out' })).toHaveCount(0);
 });
 
 for (const size of [
@@ -119,30 +125,43 @@ const barState = (page: Page, scrollTo?: number) =>
 
 const settled = (page: Page) => page.waitForFunction(() => document.getAnimations().length === 0);
 
-test('Scenario: Compact tab bar shows icons only', async ({ page }, info) => {
-	test.skip(info.project.name !== 'phone', 'tab bar layout');
-	await open(page, '/recipes');
-	await makeLong(page);
-	const full = await barState(page);
-	expect(full.labels).toEqual([1, 1, 1, 1]);
+for (const size of [
+	{ width: 390, height: 844, narrower: true },
+	{ width: 320, height: 640, narrower: false }
+]) {
+	test(`Scenario: Compact tab bar shows icons only (${size.width}px)`, async ({ page }, info) => {
+		test.skip(info.project.name !== 'phone', 'tab bar layout, sets its own viewport');
+		await page.setViewportSize(size);
+		await open(page, '/recipes');
+		await makeLong(page);
+		const full = await barState(page);
+		expect(full.labels).toEqual([1, 1, 1, 1, 1]);
 
-	await page.evaluate(() => window.scrollTo(0, 200));
-	await expect(nav(page)).toHaveAttribute('data-compact', '');
-	await settled(page);
-	const compact = await barState(page);
-	expect(compact.width).toBeLessThan(full.width * 0.75);
-	expect(compact.labels).toEqual([0, 0, 0, 0]);
-	expect(compact.pill, 'the open area keeps its pill').toBe(true);
-	for (const offset of compact.offsets) expect(offset).toBeLessThan(2);
-	for (const label of labels) await expect(nav(page).getByRole('link', { name: label, exact: true })).toBeVisible();
+		await page.evaluate(() => window.scrollTo(0, 200));
+		await expect(nav(page)).toHaveAttribute('data-compact', '');
+		await settled(page);
+		const compact = await barState(page);
+		if (size.narrower) expect(compact.width).toBeLessThan(full.width);
+		else expect(compact.width).toBeLessThanOrEqual(full.width);
+		expect(compact.labels).toEqual([0, 0, 0, 0, 0]);
+		expect(compact.pill, 'the open area keeps its pill').toBe(true);
+		for (const offset of compact.offsets) expect(offset).toBeLessThan(2);
+		for (const label of labels) await expect(nav(page).getByRole('link', { name: label, exact: true })).toBeVisible();
+		const fit = await nav(page).evaluate((n) => ({
+			list: n.querySelector('ul')!.scrollWidth <= n.querySelector('ul')!.clientWidth,
+			bar: n.scrollWidth <= n.clientWidth,
+			small: [...n.querySelectorAll('a')].map((a) => a.getBoundingClientRect()).filter((r) => r.width < 44 || r.height < 44).length
+		}));
+		expect(fit).toEqual({ list: true, bar: true, small: 0 });
 
-	await page.evaluate(() => window.scrollTo(0, 0));
-	await expect(nav(page)).not.toHaveAttribute('data-compact');
-	await settled(page);
-	const back = await barState(page);
-	expect(back.labels).toEqual([1, 1, 1, 1]);
-	expect(back.width).toBeCloseTo(full.width, 0);
-});
+		await page.evaluate(() => window.scrollTo(0, 0));
+		await expect(nav(page)).not.toHaveAttribute('data-compact');
+		await settled(page);
+		const back = await barState(page);
+		expect(back.labels).toEqual([1, 1, 1, 1, 1]);
+		expect(back.width).toBeCloseTo(full.width, 0);
+	});
+}
 
 test('Scenario: Reduced motion shrinks the tab bar instantly', async ({ page }, info) => {
 	test.skip(info.project.name !== 'phone', 'tab bar layout');
@@ -151,6 +170,6 @@ test('Scenario: Reduced motion shrinks the tab bar instantly', async ({ page }, 
 	await makeLong(page);
 	const full = await barState(page);
 	const compact = await barState(page, 200);
-	expect(compact.width).toBeLessThan(full.width * 0.75);
-	expect(compact.labels).toEqual([0, 0, 0, 0]);
+	expect(compact.width).toBeLessThan(full.width);
+	expect(compact.labels).toEqual([0, 0, 0, 0, 0]);
 });

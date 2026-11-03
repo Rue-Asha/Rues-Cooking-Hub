@@ -7,14 +7,14 @@
 
 	let { children }: { children: Snippet } = $props();
 
-	const recipePage = (id: string | null) => id === '/(app)/recipes/[id]';
+	const heroPage = (id: string | null) => id === '/(app)/recipes/[id]' || id === '/(app)/eating-out/[id]';
 
 	// filter and sort changes inside an area animate their own content (FLIP), not the whole page;
-	// to and from a recipe page the transition carries the card's photo into the hero and back
+	// to and from a recipe or spot page the transition carries the card's photo into the hero and back
 	onNavigate((navigation) => {
 		if (!navigation.from || !navigation.to) return;
 		const sameArea = activeArea(navigation.from.url.pathname) === activeArea(navigation.to.url.pathname);
-		if (sameArea && !recipePage(navigation.from.route.id) && !recipePage(navigation.to.route.id)) return;
+		if (sameArea && !heroPage(navigation.from.route.id) && !heroPage(navigation.to.route.id)) return;
 		return viewTransition(navigation);
 	});
 </script>

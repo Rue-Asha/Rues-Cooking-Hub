@@ -1,4 +1,4 @@
-Mockup photos for /__mockups (design reference only). Downloaded once on 2026-10-19 via the Openverse catalogue.
+Mockup photos for /__mockups (design reference only). Recipe photos downloaded once on 2026-10-19 via the Openverse catalogue; spot-*.jpg on 2026-11-02 from Wikimedia Commons (Openverse was down), resized to 1600 px.
 Format: file | source URL | author: name | licence: name (URL)
 
 pumpkin-soup.jpg | https://www.rawpixel.com/image/432999/pumpkin-soup | author: Markus Spiske | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
@@ -9,3 +9,8 @@ penne-arrabbiata.jpg | https://stocksnap.io/photo/vegan-pasta-KRX6BEOKGM | autho
 spaghetti-pomodoro.jpg | https://stocksnap.io/photo/pasta-tomato-PF8WHPHNGH | author: Jamie Hamel-Smith | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
 yoghurt-bowl.jpg | https://stocksnap.io/photo/breakfast-bowl-V9AOG26R2W | author: JESHOOTS.com | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
 lentil-soup.jpg | https://stocksnap.io/photo/bowl-soup-WOZ7PQGMMI | author: Foodie Girl | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+spot-interior.jpg | https://commons.wikimedia.org/wiki/File:Restaurant_interior,_Paris.jpg | author: Gerda Arendt | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+spot-terrace.jpg | https://commons.wikimedia.org/wiki/File:Madrid_-_Malasa%C3%B1a,_Plaza_Juan_Pujol_8.jpg | author: Zarateman | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+spot-wine-bar.jpg | https://commons.wikimedia.org/wiki/File:Wine_bar_(Unsplash).jpg | author: Felipe Benoit Photography (felipegraphy) | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+spot-pizzeria.jpg | https://commons.wikimedia.org/wiki/File:Pizzeria_Casa_Sauvage,_Villard-Reculas,_2026.jpg | author: DimiTalen | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+spot-ramen.jpg | https://commons.wikimedia.org/wiki/File:Pork_Chashu_Bowl_(M)_-_Goemon_Ramen_Bar.jpg | author: Andy Li | licence: CC0 1.0 Universal Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)

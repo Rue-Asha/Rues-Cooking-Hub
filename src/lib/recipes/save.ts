@@ -39,7 +39,7 @@ type Resolved = { imageId: Id | null; imageFailed: boolean } | { error: string }
 
 // An uploaded file wins over a link, a link over "Remove image"; with none of them the stored image stays.
 // A broken file is the user's to fix, a broken link only costs the new image: the stored one stays.
-async function resolveImage(form: FormData, stored: Id | null): Promise<Resolved> {
+export async function resolveImage(form: FormData, stored: Id | null): Promise<Resolved> {
 	const file = form.get('image');
 	if (file instanceof File && file.size > 0) {
 		try {

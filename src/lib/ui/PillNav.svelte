@@ -5,6 +5,7 @@
 		href: string;
 		label: string;
 		icon: IconName;
+		divider?: boolean;
 	}
 </script>
 
@@ -63,6 +64,7 @@
 	{/if}
 	<ul bind:this={list}>
 		{#each items as item (item.href)}
+			{#if item.divider}<li role="presentation" aria-hidden="true" data-divider></li>{/if}
 			<li>
 				<a href={item.href} aria-current={item.href === current ? 'page' : undefined}>
 					{#if variant === 'bar'}<Icon name={item.icon} size={22} />{/if}
@@ -144,12 +146,30 @@
 		transform: scale(0.94);
 	}
 
+	li[data-divider] {
+		flex: 0 0 auto;
+		align-self: center;
+		inline-size: 1px;
+		block-size: 18px;
+		margin-inline: 4px;
+		background: var(--line);
+	}
+
 	.bar ul {
 		justify-content: space-between;
 	}
 
 	.bar li {
 		flex: 1;
+	}
+
+	.bar li[data-divider] {
+		flex: 0 0 auto;
+		block-size: 20px;
+	}
+
+	.bar[data-compact] li {
+		min-inline-size: 0;
 	}
 
 	.bar a {

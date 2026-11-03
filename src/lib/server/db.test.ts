@@ -30,6 +30,44 @@ function tagNames(db: DatabaseSync): string[] {
 		.map((r) => String(r.name));
 }
 
+describe('0003_food_spots', () => {
+	it('Scenario: Migration keeps existing recipe data', () => {
+		const db = openDb(join(dir, 'upgrade.db'));
+		const all = loadMigrations();
+		migrate(db, all.slice(0, 2));
+		const now = '2026-10-19T08:00:00.000Z';
+		const image = Number(
+			db
+				.prepare("INSERT INTO images (mime, width, height, bytes, created_at) VALUES ('image/png', 1, 1, x'00', ?)")
+				.run(now).lastInsertRowid
+		);
+		const recipe = Number(
+			db
+				.prepare('INSERT INTO recipes (title, servings, image_id, created_at, updated_at) VALUES (?, 2, ?, ?, ?)')
+				.run('Soup', image, now, now).lastInsertRowid
+		);
+		db.prepare("INSERT INTO tags (name, name_key) VALUES ('Mine', 'mine')").run();
+		db.prepare('INSERT INTO recipe_tags (recipe_id, tag_id) VALUES (?, 1), (?, 9)').run(recipe, recipe);
+		db.prepare(
+			"INSERT INTO plan_entries (date, slot, position, recipe_id, servings) VALUES ('2026-10-19', 'dinner', 0, ?, 2)"
+		).run(recipe);
+
+		migrate(db, all);
+
+		expect(applied(db)).toContain('0003_food_spots.sql');
+		for (const t of ['spots', 'spot_tags', 'spot_tag_links'])
+			expect(db.prepare('SELECT 1 FROM sqlite_master WHERE name = ?').get(t), t).toBeDefined();
+		expect(db.prepare('SELECT title, image_id FROM recipes').all()).toEqual([{ title: 'Soup', image_id: image }]);
+		expect(db.prepare('SELECT tag_id FROM recipe_tags ORDER BY tag_id').all()).toEqual([{ tag_id: 1 }, { tag_id: 9 }]);
+		expect(db.prepare('SELECT count(*) AS n FROM images').get()?.n).toBe(1);
+		expect(db.prepare('SELECT recipe_id, servings FROM plan_entries').all()).toEqual([
+			{ recipe_id: recipe, servings: 2 }
+		]);
+		expect(tagNames(db)).toHaveLength(9);
+		db.close();
+	});
+});
+
 describe('db', () => {
 	it('Scenario: Fresh database gets the schema and starter tags', () => {
 		const db = openDb(join(dir, 'fresh.db'));

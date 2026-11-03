@@ -161,3 +161,67 @@ export interface Dashboard {
 	list: { open: number; first: string[] }; // first ≤ 3 open item names in display order
 	favourite: RecipeCard | null;
 }
+
+export type SpotStatus = 'want' | 'visited';
+export type SpotSort = 'score' | 'newest' | 'name';
+export type Price = 1 | 2 | 3 | 4;
+
+// stored fields; scoreHundredths is 875 for 8.75 and null exactly when status is 'want'
+export interface Spot {
+	id: Id;
+	name: string;
+	status: SpotStatus;
+	scoreHundredths: number | null;
+	price: Price | null;
+	city: string | null;
+	neighbourhood: string | null;
+	address: string | null;
+	website: string | null;
+	notes: string | null;
+	imageId: Id | null;
+	createdAt: string;
+	updatedAt: string;
+	tags: Tag[];
+}
+export interface SpotCard {
+	id: Id;
+	name: string;
+	status: SpotStatus;
+	scoreHundredths: number | null;
+	price: Price | null;
+	city: string | null;
+	neighbourhood: string | null;
+	imageId: Id | null;
+	tags: Tag[];
+	createdAt: string;
+	rank: number | null; // derived: only Visited cards while sorted by score
+}
+export interface SpotInput {
+	name: string;
+	status: SpotStatus;
+	scoreHundredths: number | null;
+	price: Price | null;
+	city: string | null;
+	neighbourhood: string | null;
+	address: string | null;
+	website: string | null;
+	notes: string | null;
+	imageId: Id | null; // on update a different id or null deletes the old image row
+	tagNames: string[]; // ensureSpotTags() resolves them
+}
+export interface SpotQuery {
+	status: SpotStatus;
+	q: string;
+	tagIds: Id[];
+	city: string | null; // fold(city)
+	price: Price | null;
+	sort: SpotSort;
+}
+export interface SpotCounts {
+	visited: number;
+	want: number;
+}
+export interface SpotFacets {
+	tags: Tag[]; // spot tags in use, by name
+	cities: { key: string; name: string }[]; // one per fold(city), name = spelling of the oldest spot, by name
+}

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { existsSync } from 'node:fs';
 
-const screens = ['home', 'recipes', 'recipe', 'import', 'import-fallback', 'plan', 'list'];
+const screens = ['home', 'recipes', 'recipe', 'import', 'import-fallback', 'plan', 'list', 'eating-out'];
 
 for (const screen of screens) {
 	test(`Scenario: Mockup screenshots are produced for both viewports (${screen})`, async ({ page }, info) => {
