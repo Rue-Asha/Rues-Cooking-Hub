@@ -61,3 +61,4 @@ export function viewTransition(navigation: OnNavigate): Promise<void> | void {
 }
 
 export const heroName = (id: number): string => `recipe-hero-${id}`;
+export const spotHeroName = (id: number): string => `spot-hero-${id}`;

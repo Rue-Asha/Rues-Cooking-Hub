@@ -14,5 +14,9 @@ export const COPY = {
 	nothingToCopy: 'Nothing to copy',
 	nothingPlanned: 'Nothing planned in this range',
 	noMatch: 'No recipes match',
-	discard: 'Discard changes?'
+	discard: 'Discard changes?',
+	nameRequired: 'Name is required',
+	scoreRequired: 'Visited spots need a score',
+	scoreInvalid: 'Enter a score from 1.00 to 10.00, at most two decimals',
+	spotsNoMatch: 'No spots match'
 } as const;

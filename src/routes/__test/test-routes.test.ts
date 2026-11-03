@@ -1,7 +1,10 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { closeDb, getDb, openDb, migrate } from '#lib/server/db.ts';
 import { setTestToday, today } from '#lib/server/clock.ts';
 import { POST as clock } from './clock/+server.ts';
@@ -33,6 +36,26 @@ afterEach(() => {
 	delete process.env.COOKING_HUB_TEST;
 });
 
+let origin: string;
+let fixtures: Server;
+const sourdough = readFileSync('static/mockups/sourdough.jpg');
+
+beforeAll(async () => {
+	fixtures = createServer((req, res) => {
+		if (req.url === '/mockups/sourdough.jpg') res.writeHead(200, { 'content-type': 'image/jpeg' }).end(sourdough);
+		else res.writeHead(404).end();
+	});
+	await new Promise<void>((done) => fixtures.listen(0, '127.0.0.1', done));
+	origin = `http://127.0.0.1:${(fixtures.address() as AddressInfo).port}`;
+});
+
+afterAll(() => {
+	fixtures.close();
+});
+
+const postTo = (url: string, body: unknown): never =>
+	({ request: new Request(url, { method: 'POST', body: JSON.stringify(body) }) }) as never;
+
 describe('test routes', () => {
 	it('Scenario: Test routes answer 404 without the test flag', async () => {
 		await seed(post({ recipes: [{ title: 'Soup' }] }));
@@ -58,7 +81,8 @@ describe('test routes', () => {
 				],
 				entries: [{ date: '2026-10-19', slot: 'dinner', recipe: 0, servings: 3 }],
 				items: [{ name: 'Milk' }],
-				categoryMemory: [{ name: 'Milk', category: 'dairy-eggs' }]
+				categoryMemory: [{ name: 'Milk', category: 'dairy-eggs' }],
+				spots: [{ name: 'Café', tags: ['Brunch'], image: true }, { name: 'Bar' }]
 			})
 		);
 		setTestToday('2026-01-01');
@@ -66,7 +90,7 @@ describe('test routes', () => {
 		const res = await reset(post({}));
 
 		expect(res.status).toBe(204);
-		for (const t of ['recipes', 'recipe_tags', 'ingredient_lines', 'step_lines', 'images', 'plan_entries', 'shopping_items', 'category_memory'])
+		for (const t of ['recipes', 'recipe_tags', 'ingredient_lines', 'step_lines', 'images', 'plan_entries', 'shopping_items', 'category_memory', 'spots', 'spot_tags', 'spot_tag_links'])
 			expect(count(t), t).toBe(0);
 		const fresh = openDb(join(dir, 'fresh.db'));
 		migrate(fresh);
@@ -149,10 +173,77 @@ describe('test routes', () => {
 		expect((image?.bytes as Uint8Array).length).toBeGreaterThan(0);
 	});
 
+	it('Scenario: Seed returns the ids of what it inserted (spots)', async () => {
+		const res = await seed(
+			post({
+				recipes: [{ title: 'Soup', tags: ['Soup'] }],
+				spots: [
+					{
+						name: 'Café Müller',
+						status: 'visited',
+						scoreHundredths: 875,
+						price: 2,
+						city: 'Berlin',
+						neighbourhood: 'Mitte',
+						address: 'Hauptstraße 5',
+						website: 'https://example.com',
+						notes: 'Ramen',
+						tags: ['Brunch', 'soup'],
+						createdAt: '2026-01-01T00:00:00.000Z'
+					},
+					{ name: 'Bar' }
+				]
+			})
+		);
+
+		const ids = await res.json();
+		const db = getDb();
+		expect(ids.spots).toHaveLength(2);
+		expect(db.prepare('SELECT * FROM spots WHERE id = ?').get(ids.spots[0])).toMatchObject({
+			name: 'Café Müller',
+			status: 'visited',
+			score_hundredths: 875,
+			price: 2,
+			city: 'Berlin',
+			neighbourhood: 'Mitte',
+			address: 'Hauptstraße 5',
+			website: 'https://example.com',
+			notes: 'Ramen',
+			image_id: null,
+			created_at: '2026-01-01T00:00:00.000Z',
+			search_text: 'café müller\nmitte\nberlin\nbrunch\nsoup\nramen'
+		});
+		expect(db.prepare('SELECT status, score_hundredths, created_at FROM spots WHERE id = ?').get(ids.spots[1])).toMatchObject({
+			status: 'want',
+			score_hundredths: null
+		});
+		expect(db.prepare('SELECT name FROM spot_tags ORDER BY name').all().map((r) => r.name)).toEqual(['Brunch', 'soup']);
+		expect(count('tags')).toBe(8);
+	});
+
+	it('Scenario: Seeded spots carry their photos', async () => {
+		const res = await seed(
+			postTo(`${origin}/__test/seed`, {
+				spots: [{ name: 'Synthetic', image: true }, { name: 'Fixture', image: '/mockups/sourdough.jpg' }, { name: 'None' }]
+			})
+		);
+
+		const ids = await res.json();
+		const image = (id: number) =>
+			getDb()
+				.prepare('SELECT i.mime, length(i.bytes) AS n FROM spots s JOIN images i ON i.id = s.image_id WHERE s.id = ?')
+				.get(id);
+		expect(image(ids.spots[0])).toMatchObject({ mime: 'image/png' });
+		expect(image(ids.spots[1])).toMatchObject({ mime: 'image/webp' });
+		expect(Number(image(ids.spots[1])?.n)).toBeGreaterThan(0);
+		expect(image(ids.spots[2])).toBeUndefined();
+		expect(count('images')).toBe(2);
+	});
+
 	it('seeding nothing returns empty lists', async () => {
 		const res = await seed(post({}));
 
-		expect(await res.json()).toEqual({ recipes: [], entries: [], items: [] });
+		expect(await res.json()).toEqual({ recipes: [], entries: [], items: [], spots: [] });
 	});
 
 	it('the clock route sets and clears the server date', async () => {

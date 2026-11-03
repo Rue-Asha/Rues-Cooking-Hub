@@ -5,6 +5,7 @@
 	import WeekTile from '#lib/home/WeekTile.svelte';
 	import { heroName } from '#lib/motion.ts';
 	import FavouriteButton from '#lib/recipes/FavouriteButton.svelte';
+	import SpotCard from '#lib/spots/SpotCard.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Card from '#lib/ui/Card.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
@@ -71,6 +72,20 @@
 							{#snippet fav()}<FavouriteButton id={recipe.id} title={recipe.title} favourite={recipe.favourite} />{/snippet}
 						</Card>
 					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
+
+	{#if data.spots.length > 0}
+		<section class="recent" aria-labelledby="spots-title">
+			<div class="section-head">
+				<h2 id="spots-title" data-section-heading>Top spots</h2>
+				<a class="more" href="/eating-out">All spots <Icon name="arrow-right" size={16} /></a>
+			</div>
+			<ul class="grid">
+				{#each data.spots as spot, i (spot.id)}
+					<li style:--i={i}><SpotCard {spot} /></li>
 				{/each}
 			</ul>
 		</section>

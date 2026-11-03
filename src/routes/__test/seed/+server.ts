@@ -3,10 +3,12 @@ import { json } from '@sveltejs/kit';
 import { parseIngredient } from '#lib/ingredients/parse.ts';
 import { nameKey } from '#lib/shopping/aggregate.ts';
 import { getDb } from '#lib/server/db.ts';
+import { storeImageFromUrl } from '#lib/server/images.ts';
 import { refreshSearchText } from '#lib/server/recipes.ts';
+import { refreshSpotSearchText } from '#lib/server/spots.ts';
 import { requireTestFlag } from '#lib/server/test-flag.ts';
 import { fold } from '#lib/text.ts';
-import type { Amount, Category, Id, IsoDate, Section, Slot } from '#lib/types.ts';
+import type { Amount, Category, Id, IsoDate, Price, Section, Slot, SpotStatus } from '#lib/types.ts';
 import type { RequestHandler } from './$types';
 
 // `entries[].recipe` is an index into this request's `recipes`, because the ids only exist once the rows are inserted.
@@ -37,12 +39,27 @@ export interface SeedInput {
 		origin?: 'manual' | 'plan';
 	}[];
 	categoryMemory?: { name: string; category: Category }[];
+	spots?: {
+		name: string;
+		status?: SpotStatus;
+		scoreHundredths?: number;
+		price?: Price;
+		city?: string;
+		neighbourhood?: string;
+		address?: string;
+		website?: string;
+		notes?: string;
+		tags?: string[];
+		createdAt?: string;
+		image?: boolean | string; // true: the generated image; '/mockups/<file>': that fixture photo, stored from this origin
+	}[];
 }
 
 export interface SeedResult {
 	recipes: Id[];
 	entries: Id[];
 	items: Id[];
+	spots: Id[];
 }
 
 function png(width: number, height: number): Uint8Array {
@@ -81,7 +98,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const input = (await request.json()) as SeedInput;
 	const db = getDb();
 	const now = new Date().toISOString();
-	const result: SeedResult = { recipes: [], entries: [], items: [] };
+	const result: SeedResult = { recipes: [], entries: [], items: [], spots: [] };
 	const servingsOf: number[] = [];
 
 	const insertImage = db.prepare(
@@ -182,6 +199,49 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const remember = db.prepare('INSERT OR REPLACE INTO category_memory (name_key, category) VALUES (?, ?)');
 	for (const m of input.categoryMemory ?? []) remember.run(nameKey(m.name), m.category);
+
+	const insertSpot = db.prepare(
+		`INSERT INTO spots (name, status, score_hundredths, price, city, neighbourhood, address, website, notes, image_id,
+		                    created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	);
+	const findSpotTag = db.prepare('SELECT id FROM spot_tags WHERE name_key = ?');
+	const insertSpotTag = db.prepare('INSERT INTO spot_tags (name, name_key) VALUES (?, ?)');
+	const linkSpotTag = db.prepare('INSERT OR IGNORE INTO spot_tag_links (spot_id, tag_id) VALUES (?, ?)');
+	for (const s of input.spots ?? []) {
+		const imageId =
+			typeof s.image === 'string'
+				? await storeImageFromUrl(new URL(s.image, request.url).href)
+				: s.image
+					? Number(insertImage.run(IMAGE.width, IMAGE.height, IMAGE.bytes, now).lastInsertRowid)
+					: null;
+		const createdAt = s.createdAt ?? now;
+		const id = Number(
+			insertSpot.run(
+				s.name,
+				s.status ?? 'want',
+				s.scoreHundredths ?? null,
+				s.price ?? null,
+				s.city ?? null,
+				s.neighbourhood ?? null,
+				s.address ?? null,
+				s.website ?? null,
+				s.notes ?? null,
+				imageId,
+				createdAt,
+				createdAt
+			).lastInsertRowid
+		);
+		for (const name of s.tags ?? []) {
+			const key = fold(name);
+			const tagId =
+				(findSpotTag.get(key)?.id as number | undefined) ??
+				Number(insertSpotTag.run(name.trim(), key).lastInsertRowid);
+			linkSpotTag.run(id, tagId);
+		}
+		refreshSpotSearchText(id);
+		result.spots.push(id);
+	}
 
 	return json(result);
 };

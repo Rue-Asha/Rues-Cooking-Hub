@@ -15,6 +15,11 @@
 		favourite = false,
 		compact = false,
 		fav,
+		heart = true,
+		badge,
+		rank = null,
+		subtitle = null,
+		extra,
 		heroName = null,
 		class: cls = ''
 	}: {
@@ -28,6 +33,16 @@
 		compact?: boolean;
 		// a live favourite control in place of the static heart
 		fav?: Snippet;
+		// false: no favourite control at all
+		heart?: boolean;
+		// pill in the photo's top-end corner (a score)
+		badge?: Snippet;
+		// "#n" pill in the photo's top-start corner
+		rank?: number | null;
+		// one clamped line under the title
+		subtitle?: string | null;
+		// leading items of the meta row, before the chips
+		extra?: Snippet;
 		// view-transition-name for the card → recipe hero hand-off
 		heroName?: string | null;
 		class?: string;
@@ -39,20 +54,26 @@
 		{#if image}<img src={image} alt="" loading="lazy" />{:else}<ImagePlaceholder />{/if}
 	</div>
 	<!-- outside .media: its view-transition-name makes it a stacking context that would trap the heart under the card link -->
-	{#if fav}
-		<div class="fav">{@render fav()}</div>
-	{:else}
-		<IconButton
-			class="fav"
-			icon="heart"
-			label={favourite ? `Remove ${title} from favourites` : `Add ${title} to favourites`}
-			pressed={favourite}
-		/>
+	{#if rank !== null}<span class="corner rank tnum">#{rank}</span>{/if}
+	{#if badge}<span class="corner badge tnum">{@render badge()}</span>{/if}
+	{#if heart}
+		{#if fav}
+			<div class="fav">{@render fav()}</div>
+		{:else}
+			<IconButton
+				class="fav"
+				icon="heart"
+				label={favourite ? `Remove ${title} from favourites` : `Add ${title} to favourites`}
+				pressed={favourite}
+			/>
+		{/if}
 	{/if}
 	<div class="body">
 		<h3><a {href}>{title}</a></h3>
+		{#if subtitle}<p class="subtitle">{subtitle}</p>{/if}
 		{#if description}<p class="desc">{description}</p>{/if}
 		<div class="meta">
+			{#if extra}{@render extra()}{/if}
 			{#if minutes !== null}<span class="time tnum"><Icon name="clock" size={15} />{minutes} min</span>{/if}
 			{#each tags.slice(0, compact ? 1 : 2) as tag (tag)}<Chip static size="sm" label={tag} />{/each}
 		</div>
@@ -108,6 +129,36 @@
 		z-index: 2;
 	}
 
+	.corner {
+		position: absolute;
+		inset-block-start: 14px;
+		z-index: 2;
+		display: inline-flex;
+		align-items: center;
+		min-block-size: 28px;
+		padding: 0 10px;
+		border-radius: var(--r-pill);
+		font-size: 13px;
+		font-weight: 600;
+		line-height: 1;
+		pointer-events: none;
+	}
+
+	.badge {
+		inset-inline-end: 14px;
+		background: var(--dark);
+		color: var(--on-dark);
+	}
+
+	.rank {
+		inset-inline-start: 14px;
+		background: var(--glass-strong);
+		backdrop-filter: var(--glass-filter);
+		-webkit-backdrop-filter: var(--glass-filter);
+		border: 1px solid var(--glass-border);
+		color: var(--ink);
+	}
+
 	.body {
 		display: flex;
 		flex-direction: column;
@@ -131,6 +182,15 @@
 		inset: 0;
 		border-radius: inherit;
 		z-index: 1;
+	}
+
+	.subtitle {
+		font-size: 13px;
+		line-height: 1.35;
+		color: var(--ink-2);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.desc {

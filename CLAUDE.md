@@ -26,6 +26,7 @@ viewport or only uses `request` runs in one project (`test.skip(info.project.nam
 ## Specs
 - Before changing archive, read openspec/specs/archive/spec.md.
 - Before changing design-system, read openspec/specs/design-system/spec.md.
+- Before changing eating-out, read openspec/specs/eating-out/spec.md.
 - Before changing harness, read openspec/specs/harness/spec.md.
 - Before changing home, read openspec/specs/home/spec.md.
 - Before changing ingredients, read openspec/specs/ingredients/spec.md.
@@ -41,3 +42,5 @@ viewport or only uses `request` runs in one project (`test.skip(info.project.nam
 
 ## Learnings
 - **Svelte outro transitions on menus/forms/sheets** → set `aria-hidden` on `outrostart` (Svelte only sets `inert`) and run a new e2e file with `--repeat-each` before committing. (weil: plan-entries "Edit and delete an entry" failed 6/10 on phone from a strict-mode duplicate Save during a 160 ms outro) [2026-10-20 · build-cooking-hub]
+- **proof:full or a mockup/dev server run by hand** → always set `PORT` (free, check `ss -ltn`) and `COOKING_HUB_TEST=1` for `/__mockups/*` and `/__test/*`. (weil: 4173 and 5173 were held by another repo's server (Notes-Archive), proof:full hit it and Rue got a 500 on the mockups) [2026-11-03 · add-food-spots]
+- **Playwright `beforeEach` that needs `info`** → write `({}, info)`, not `(_, info)`. (weil: Playwright parses the destructuring form to pick fixtures and rejects `_`) [2026-11-03 · add-food-spots]

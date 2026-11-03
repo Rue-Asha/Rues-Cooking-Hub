@@ -57,6 +57,9 @@ describe('0002_core schema', () => {
 				'recipe_tags',
 				'recipes',
 				'shopping_items',
+				'spot_tag_links',
+				'spot_tags',
+				'spots',
 				'step_lines',
 				'tags'
 			])
@@ -120,5 +123,41 @@ describe('0002_core schema', () => {
 		db.prepare('DELETE FROM recipes WHERE id = ?').run(id);
 		for (const t of ['recipe_tags', 'ingredient_lines', 'step_lines'])
 			expect(db.prepare(`SELECT count(*) AS n FROM ${t}`).get()?.n, t).toBe(0);
+	});
+});
+
+function spot(status: string, score: number | null, price: number | null = null, name = 'Café') {
+	return db
+		.prepare(
+			'INSERT INTO spots (name, status, score_hundredths, price, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+		)
+		.run(name, status, score, price, NOW, NOW);
+}
+
+describe('0003_food_spots schema', () => {
+	it('Scenario: Invalid spot rows are refused by the database', () => {
+		expect(() => spot('visited', null)).toThrow(/CHECK/);
+		expect(() => spot('want', 875)).toThrow(/CHECK/);
+		expect(() => spot('want', null, 5)).toThrow(/CHECK/);
+	});
+
+	it('refuses a blank name, a score outside 100-1000 and an unknown status', () => {
+		expect(() => spot('want', null, null, '  ')).toThrow(/CHECK/);
+		expect(() => spot('visited', 99)).toThrow(/CHECK/);
+		expect(() => spot('visited', 1001)).toThrow(/CHECK/);
+		expect(() => spot('seen', null)).toThrow(/CHECK/);
+		expect(() => spot('visited', 875, 4)).not.toThrow();
+		expect(() => spot('want', null)).not.toThrow();
+	});
+
+	it('cascades a spot delete to its tag links and keeps tag names unique', () => {
+		const id = Number(spot('want', null).lastInsertRowid);
+		const tag = Number(db.prepare("INSERT INTO spot_tags (name, name_key) VALUES ('Brunch', 'brunch')").run().lastInsertRowid);
+		db.prepare('INSERT INTO spot_tag_links (spot_id, tag_id) VALUES (?, ?)').run(id, tag);
+
+		db.prepare('DELETE FROM spots WHERE id = ?').run(id);
+
+		expect(db.prepare('SELECT count(*) AS n FROM spot_tag_links').get()?.n).toBe(0);
+		expect(() => db.prepare("INSERT INTO spot_tags (name, name_key) VALUES ('BRUNCH', 'brunch')").run()).toThrow(/UNIQUE/);
 	});
 });

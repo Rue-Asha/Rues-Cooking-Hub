@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Unit 4 runs before e2e/helpers.ts exists on its branch, so it opens pages itself.
-const screens = ['home', 'recipes', 'recipe', 'import', 'import-fallback', 'plan', 'list'];
+const screens = ['home', 'recipes', 'recipe', 'import', 'import-fallback', 'plan', 'list', 'eating-out'];
 
 async function open(page: Page, screen: string) {
 	await page.goto(`/__mockups/${screen}`);

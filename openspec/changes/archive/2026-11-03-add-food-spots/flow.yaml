@@ -1,0 +1,16 @@
+track: feature
+triage: 'feature — new Eating Out area (own entity, migration, CRUD, list, score, nav divider, Home section). Appetite: two evenings.'
+gate0: 2026-11-02
+gate1: 2026-11-02
+gate2: 2026-11-03
+base: main
+learnings:
+  - 'U1: a subagent cannot get a completion notice for its own run_in_background proof:full once it ends its turn; it used a bounded `timeout 300 bash -c while [ ! -s out ]` wait after a first timeout → builder briefs should say how to await a background proof:full'
+  - 'U1: scenario "Unused spot tag drops out" passed against the typed-empty stub, so it was never red → planner should give such absence scenarios a mutation check instead of fail-first'
+  - 'U3: Openverse timed out on all 3 searches (25 s each) again; Wikimedia Commons delivered 5 photos within the cap → name Wikimedia Commons as the first photo source'
+  - 'U2: Playwright beforeEach needs the ({}, info) destructuring form, not (_, info)'
+  - 'U2: phone bar at 320 px fits five labels + divider with zero slack (scrollWidth 294 = clientWidth 294) → any later label/padding change overflows; nav-fit e2e guards it'
+  - 'Mockup review: /__mockups/* answer only with COOKING_HUB_TEST=1, and port 5173 was held by another repo''s dev server (Notes-Archive, 500); Rue got an internal error → the taste-stop message gives the exact command incl. the flag and a free port'
+  - 'Resume: flow-unit start/drop expected unit worktrees at ~/.cache/flow/<repo>/ but earlier ones lived under ~/.cache/flow/add-food-spots/ → start failed with "already used by worktree" and drop with "not a working tree"; resumed units were removed by hand after merge-base --is-ancestor and branch -D'
+  - 'Verify: orchestrator ran proof:full without PORT and hit port 4173 held by another repo''s server (Notes-Archive) → briefs and orchestrator runs always set PORT'
+  - 'Verify r1: a fixer guard (visit 404 unless want) added behaviour no scenario covered → a spec scenario was added in the same round before the scoped review; verification.md was restamped after a rerun at the final tip'

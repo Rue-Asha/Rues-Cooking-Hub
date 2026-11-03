@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { activeArea, areas } from '#lib/nav.ts';
+	import { activeArea, areas, headerActions } from '#lib/nav.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import IconButton from '#lib/ui/IconButton.svelte';
 	import PillNav from '#lib/ui/PillNav.svelte';
 
-	const current = $derived(areas.find((a) => a.area === activeArea(page.url.pathname))!.href);
+	const area = $derived(activeArea(page.url.pathname));
+	const current = $derived(areas.find((a) => a.area === area)!.href);
+	const actions = $derived(headerActions(area));
 
 	let scrollY = $state(0);
 	const compact = $derived(scrollY > 48);
@@ -21,8 +23,8 @@
 		</a>
 		<PillNav items={areas} {current} {compact} />
 		<div class="actions">
-			<IconButton icon="search" label="Search recipes" href="/recipes" />
-			<Button href="/recipes/new">Add recipe</Button>
+			<IconButton icon="search" label={actions.search.label} href={actions.search.href} />
+			<Button href={actions.add.href}>{actions.add.label}</Button>
 		</div>
 	</div>
 </header>
@@ -131,9 +133,9 @@
 			transition: inline-size var(--d-base) var(--ease-out);
 		}
 
-		/* icons only: four 44 px targets plus the pill's breathing room */
+		/* icons only: five 44 px targets, the divider and the pill's breathing room */
 		.tabbar.compact {
-			inline-size: 248px;
+			inline-size: min(284px, 100% - 2 * var(--s-3));
 		}
 	}
 

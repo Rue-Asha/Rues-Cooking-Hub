@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import { headerActions } from '#lib/nav.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import IconButton from '#lib/ui/IconButton.svelte';
 	import PillNav, { type NavItem } from '#lib/ui/PillNav.svelte';
@@ -11,12 +12,14 @@
 		{ href: '/__mockups/home', label: 'Home', icon: 'home' },
 		{ href: '/__mockups/recipes', label: 'Recipes', icon: 'book' },
 		{ href: '/__mockups/plan', label: 'Plan', icon: 'calendar' },
-		{ href: '/__mockups/list', label: 'List', icon: 'basket' }
+		{ href: '/__mockups/list', label: 'List', icon: 'basket' },
+		{ href: '/__mockups/eating-out', label: 'Eating Out', icon: 'pin', divider: true }
 	];
 
 	const screen = $derived(page.url.pathname.split('/')[2] ?? 'home');
 	const area = $derived(['recipe', 'import', 'import-fallback'].includes(screen) ? 'recipes' : screen);
 	// the recipe page's hero runs under the floating nav; every other screen starts below it
+	const actions = $derived(headerActions(area === 'eating-out' ? 'eating-out' : 'home'));
 	const bleed = $derived(screen === 'recipe');
 </script>
 
@@ -32,8 +35,8 @@
 		</a>
 		<PillNav {items} current="/__mockups/{area}" />
 		<div class="actions">
-			<IconButton icon="search" label="Search recipes" href="/__mockups/recipes" />
-			<Button href="/__mockups/import">Add recipe</Button>
+			<IconButton icon="search" label={actions.search.label} href={area === 'eating-out' ? '/__mockups/eating-out' : '/__mockups/recipes'} />
+			<Button href={area === 'eating-out' ? '/__mockups/eating-out' : '/__mockups/import'}>{actions.add.label}</Button>
 		</div>
 	</div>
 </header>
