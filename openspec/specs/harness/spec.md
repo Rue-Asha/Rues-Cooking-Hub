@@ -90,11 +90,11 @@ SHALL set the server's "today" (or clear it with `null`).
 - **proof:** unit
 
 ### Requirement: Harness declaration
-`CLAUDE.md` SHALL contain `## Harness` declaring proof `npm run proof`, proof-full `npm run proof:full`, run
+`AGENTS.md` SHALL contain `## Harness` declaring proof `npm run proof`, proof-full `npm run proof:full`, run
 `npm run dev` → http://localhost:5173, package, `ship: merge` and `release: tag`.
 
 #### Scenario: Harness declared with merge and tag policy
-- **WHEN** `CLAUDE.md` is read
+- **WHEN** `AGENTS.md` is read
 - **THEN** its `## Harness` section lists `proof`, `proof-full`, `run`, `package`, `ship: merge` and `release: tag`
 - **proof:** manual (documentation; checked by reading the file at Gate 2)
 
