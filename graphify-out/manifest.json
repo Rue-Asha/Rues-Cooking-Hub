@@ -1450,5 +1450,71 @@
     "seen": 1793867573.189503,
     "ast_hash": "3ff581686bd204d588e839de3e1c7562",
     "semantic_hash": "3ff581686bd204d588e839de3e1c7562"
+  },
+  "PRODUCT.md": {
+    "mtime": 1794472957.78339,
+    "seen": 1794473048.265885,
+    "ast_hash": "052668b263d17b54e877818055739218",
+    "semantic_hash": ""
+  },
+  "docs/functional-contract.md": {
+    "mtime": 1794472949.583498,
+    "seen": 1794473048.2658882,
+    "ast_hash": "c65c5eae616306e5c328592447437ef3",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/.openspec.yaml": {
+    "mtime": 1794472958.1391222,
+    "seen": 1794473048.2657015,
+    "ast_hash": "3d81d1267eddd749eda85fff90308b20",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/design.md": {
+    "mtime": 1794473010.2976544,
+    "seen": 1794473048.2659364,
+    "ast_hash": "6d1e75d67636ecba563e7aea34c15a8c",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/proposal.md": {
+    "mtime": 1794473010.297228,
+    "seen": 1794473048.2659378,
+    "ast_hash": "4537cf25b2a8ca7e577378463c085ae2",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/specs/archive/spec.md": {
+    "mtime": 1794473010.3006546,
+    "seen": 1794473048.2659395,
+    "ast_hash": "51b13d2d985029b11628e578074ea91f",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/specs/navigation/spec.md": {
+    "mtime": 1794473010.303655,
+    "seen": 1794473048.2659411,
+    "ast_hash": "0f6961abd3cd817b5e311970a025d459",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/specs/recipe-detail/spec.md": {
+    "mtime": 1794473010.2996547,
+    "seen": 1794473048.2659426,
+    "ast_hash": "db599d7ee69367541d81d7281e72c67c",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/specs/recipes/spec.md": {
+    "mtime": 1794473010.3024108,
+    "seen": 1794473048.2659438,
+    "ast_hash": "f4788e1598fd9290f2e7fca944cb9b67",
+    "semantic_hash": ""
+  },
+  "openspec/changes/gate-1-decisions/tasks.md": {
+    "mtime": 1794473018.693062,
+    "seen": 1794473048.2659447,
+    "ast_hash": "9ccf5d79dd7ca8c469da0bfe602898b7",
+    "semantic_hash": ""
+  },
+  "package-lock.json": {
+    "mtime": 1793646330.7270234,
+    "seen": 1794470707.5191941,
+    "ast_hash": "6aa530868312b703d9568aed1f8cf0a4",
+    "semantic_hash": ""
   }
 }
