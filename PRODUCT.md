@@ -57,4 +57,6 @@ Name: "Rues Cooking Hub". The product addresses its owner by name on Home ("What
 
 ## Accessibility & Inclusion
 
+Target: WCAG 2.2 AA, set for every app in the shared design fingerprint (Design-System).
+
 Behavior must work with keyboard only and with assistive technology: real roles and names for controls, `aria-current` for the open area, `aria-pressed` for toggles, checkbox semantics for list items, modal dialogs that trap focus and close on Escape. Reduced-motion preferences must disable non-essential motion without changing behavior. The target is WCAG 2.2 level AA on every route and dialog (decided at gate 1; details in section 5 of the contract).
