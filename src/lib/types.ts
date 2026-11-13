@@ -36,7 +36,8 @@ export interface Section<T> {
 }
 export interface ParsedLine {
 	text: string;
-	quantity: number | null;
+	quantity: number | null; // a range's upper bound
+	quantityMin?: number; // a range's lower bound; set by parseIngredient only, never stored
 	unit: string | null;
 	name: string;
 	note: string | null;

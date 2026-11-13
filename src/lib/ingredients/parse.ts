@@ -61,21 +61,24 @@ export function canonicalUnit(word: string): string | null {
 
 export interface QuantityUnit {
 	quantity: number;
+	quantityMin?: number;
 	unit: string | null;
 	rest: string;
 }
 
-// leading quantity (range → upper bound) and unit; `rest` is what follows, trimmed
+// leading quantity (range → upper bound, lower bound in quantityMin) and unit; `rest` is what follows, trimmed
 export function readQuantity(text: string): QuantityUnit | null {
 	const s = text.trim();
 	const first = number(s);
 	if (!first) return null;
 	let quantity = first.value;
+	let quantityMin: number | undefined;
 	let at = first.length;
 	const dash = s.slice(at).match(/^\s*[-–]\s*/);
 	if (dash) {
 		const second = number(s.slice(at + dash[0].length));
 		if (second) {
+			quantityMin = Math.min(quantity, second.value);
 			quantity = Math.max(quantity, second.value);
 			at += dash[0].length + second.length;
 		}
@@ -84,7 +87,9 @@ export function readQuantity(text: string): QuantityUnit | null {
 	const word = s.slice(at).match(/^\s*(\p{L}+)\.?/u);
 	const unit = word ? canonicalUnit(word[0].trim()) : null;
 	if (word && unit) at += word[0].length;
-	return { quantity, unit, rest: s.slice(at).trim() };
+	const read: QuantityUnit = { quantity, unit, rest: s.slice(at).trim() };
+	if (quantityMin !== undefined && quantityMin !== quantity) read.quantityMin = quantityMin;
+	return read;
 }
 
 // a comma between digits is a decimal comma, any other one starts the note
@@ -99,5 +104,7 @@ export function parseIngredient(text: string): ParsedLine {
 		return { text, quantity: null, unit: null, name: main.trim(), note: note || null };
 	}
 	const name = read.unit ? read.rest.replace(/^of\s+/i, '') : read.rest;
-	return { text, quantity: read.quantity, unit: read.unit, name, note: note || null };
+	const line: ParsedLine = { text, quantity: read.quantity, unit: read.unit, name, note: note || null };
+	if (read.quantityMin !== undefined) line.quantityMin = read.quantityMin;
+	return line;
 }

@@ -1,0 +1,12 @@
+track: feature
+triage: 'feature — gate-1 server/data decisions before the redesign (ecosystem-ui-revamp task 2.7). Appetite: one session'
+base: main
+gate0: 2026-11-13 (adopted; gate 1 of ecosystem-ui-revamp signed off by Rue)
+gate1: 2026-11-13
+decisions:
+  - 'Ranges get their lower bound by re-parsing the stored line text (parseIngredient(line.text)); no DB column, no migration. The redesign wires the recipe page to scale that. (Rue, Gate 1)'
+  - 'The 9 new e2e scenarios whose UI is built in the redesign are deferred, not coverage gaps; the redesign must cover them. Until then the old screen still shows Planned and Shortest time. (Rue, Gate 1)'
+learnings:
+  - 'Parallel builders must not run graphify update: it rewrites tracked graph files; leave it to the last unit (planner friction).'
+gate2: 2026-11-13
+release: 'none for this change (Rue, Gate 2): no user-visible effect; the next release comes with the redesign'

@@ -4,56 +4,33 @@
 TBD - created by archiving change build-cooking-hub. Update Purpose after archive.
 ## Requirements
 ### Requirement: Area navigation
-The app SHALL offer five areas, Home (`/`), Recipes (`/recipes`), Plan (`/plan`), List (`/list`) and Eating Out
-(`/eating-out`, map-pin icon), in this order, in a floating glass pill nav at the top on viewports at least 1024 px
-wide and in a floating pill tab bar at the bottom below that. A small decorative divider SHALL sit between List and
-Eating Out in both layouts; it SHALL be `aria-hidden`, not focusable and not a link. The current area SHALL be marked
-with `aria-current="page"`, also on pages below it (`/recipes/12` marks Recipes, `/eating-out/3/edit` marks Eating
-Out), and the sliding active pill SHALL sit exactly behind the marked link. After the page is scrolled more than 48 px
-the nav SHALL carry `data-compact` and shrink; back at the top it SHALL lose it. The compact tab bar SHALL show icons
-only (labels faded out, icons centred, the bar narrower but wide enough for five 44 px targets and the divider), its
-links keeping their names; under reduced motion the change SHALL be instant. On phones 320 px and wider the five
-labels SHALL fit the tab bar without overflow and every link SHALL be at least 44×44 px. Content SHALL never sit under
-the nav.
+The app SHALL offer four areas, Home (`/`), Recipes (`/recipes`), Plan (`/plan`) and List (`/list`), in a floating
+glass pill nav at the top on viewports at least 1024 px wide and in a floating pill tab bar at the bottom below that.
+At every width the navigation SHALL also offer the brand name "Rues Cooking Hub" (link to `/`), "Add recipe"
+(`/recipes/new`) and "Search recipes" (`/recipes`); their presentation MAY differ by width, their availability SHALL NOT.
+The current area SHALL be marked with `aria-current="page"`, also on pages below it (`/recipes/12` marks Recipes).
+After the page is scrolled more than 48 px the nav SHALL carry `data-compact` and shrink; back at the top it SHALL
+lose it. The compact tab bar SHALL show icons only (labels faded out, icons centred, the bar narrower), its links
+keeping their names; under reduced motion the change SHALL be instant. Content SHALL never sit under the nav.
 
 #### Scenario: Desktop shows the top pill nav
 - **WHEN** any area is opened at 1280×800
-- **THEN** the nav with Home, Recipes, Plan, List and Eating Out is at the top of the viewport and no tab bar is shown
+- **THEN** the nav with Home, Recipes, Plan and List is at the top of the viewport and no tab bar is shown
 - **proof:** e2e
 
 #### Scenario: Phone shows the bottom tab bar
 - **WHEN** any area is opened at 390×844
-- **THEN** the tab bar with the five areas is at the bottom of the viewport and no top nav is shown
+- **THEN** the tab bar with the four areas is at the bottom of the viewport and no top nav is shown
 - **proof:** e2e
 
 #### Scenario: Active area is marked
-- **WHEN** the active area is derived for `/`, `/recipes/12`, `/recipes/new/form`, `/plan`, `/list`, `/eating-out`, `/eating-out/new`, `/eating-out/3` and `/eating-out/3/edit`
-- **THEN** it is home, recipes, recipes, plan, list and four times eating-out
+- **WHEN** the active area is derived for `/`, `/recipes/12`, `/recipes/new/form`, `/plan` and `/list`
+- **THEN** it is home, recipes, recipes, plan and list
 - **proof:** unit
 
 #### Scenario: Nav marks the open area
-- **WHEN** `/plan` and then `/eating-out` are opened
-- **THEN** only the Plan item, and then only the Eating Out item, carries `aria-current="page"`
-- **proof:** e2e
-
-#### Scenario: Nav marks Eating Out on its sub-pages
-- **WHEN** `/eating-out/new` is opened
-- **THEN** only the Eating Out item carries `aria-current="page"` and Home does not
-- **proof:** e2e
-
-#### Scenario: Divider sits between List and Eating Out
-- **WHEN** any area is opened, in the top nav at 1280×800 and in the tab bar at 390×844
-- **THEN** the nav has exactly five links, one divider element between the List and the Eating Out link (by position), the divider is `aria-hidden="true"` and contains no link, and pressing Tab with focus on List moves focus to Eating Out
-- **proof:** e2e
-
-#### Scenario: Active pill lands on Eating Out
-- **WHEN** `/eating-out` is opened at 1280×800 and at 390×844, and on the phone the page is then scrolled 200 px
-- **THEN** in each state the active pill's left edge and width match the Eating Out link's within 1 px
-- **proof:** e2e
-
-#### Scenario: Five labels fit the phone tab bar
-- **WHEN** a page is opened at 390×844 and at 320×640
-- **THEN** at both widths the tab bar's list and the document have `scrollWidth` at most their `clientWidth`, every label is fully visible inside its link (its `scrollWidth` at most the link's width), no two links overlap, and every link is at least 44×44 px
+- **WHEN** `/plan` is opened
+- **THEN** only the Plan item carries `aria-current="page"`
 - **proof:** e2e
 
 #### Scenario: Tablet and phone landscape use one layout without overlap
@@ -67,8 +44,11 @@ the nav.
 - **proof:** e2e
 
 #### Scenario: Compact tab bar shows icons only
-- **WHEN** a page is scrolled 200 px down at 390×844 and then back to the top, and the same at 320×640
-- **THEN** after the first scroll the tab bar is narrower than before at 390 and no wider at 320, its labels are invisible, each icon sits at its item's vertical centre, the open area's pill still sits behind its icon, the links keep the names Home, Recipes, Plan, List and Eating Out, every link is at least 44×44 px and nothing overflows the bar; after the second the labels are visible and the bar has its full width again
+- **WHEN** a page is scrolled 200 px down at 390×844 and then back to the top
+- **THEN** after the first scroll the tab bar is narrower, its labels are invisible, each icon sits at its item's
+  vertical centre, the open area's pill still sits behind its icon and the links keep the names Home, Recipes, Plan
+  and List; after the second the labels are visible
+  and the bar has its full width again
 - **proof:** e2e
 
 #### Scenario: Reduced motion shrinks the tab bar instantly
@@ -78,8 +58,13 @@ the nav.
 
 #### Scenario: Nav shrink looks calm
 - **WHEN** Rue scrolls the running app on phone and desktop
-- **THEN** the nav shrinks and grows smoothly without jumping content, and the divider reads as a quiet separator, not a sixth item
+- **THEN** the nav shrinks and grows smoothly without jumping content
 - **proof:** manual (visual judgement by Rue)
+
+#### Scenario: Same actions at every width
+- **WHEN** any area is opened at 1280×800 and at 390×844
+- **THEN** in both the brand link to `/`, "Add recipe" to `/recipes/new` and "Search recipes" to `/recipes` are available besides the four areas, and exactly one navigation named "Main" is exposed
+- **proof:** e2e
 
 ### Requirement: Page transitions
 Navigation between areas SHALL animate through `document.startViewTransition` when the browser supports it and
@@ -134,5 +119,13 @@ scroll horizontally.
 #### Scenario: Desktop header fits at 1024 px
 - **WHEN** `/plan` and `/eating-out` are opened at 1024×768
 - **THEN** on both pages the brand's right edge is at most the nav pill's left edge, the pill's right edge is at most the header actions' left edge, the divider lies inside the pill, and the document's `scrollWidth` is at most its `clientWidth`
+- **proof:** e2e
+
+### Requirement: Search recipes focuses the search field
+Choosing the navigation's "Search recipes" action SHALL open `/recipes` and put focus in the "Search recipes" field of the archive, also when `/recipes` is already open.
+
+#### Scenario: Search action focuses the field
+- **WHEN** "Search recipes" is chosen from Home, and again while on `/recipes`
+- **THEN** each time `/recipes` is shown and the search field has focus
 - **proof:** e2e
 

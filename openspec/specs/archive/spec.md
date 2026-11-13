@@ -184,7 +184,7 @@ no match SHALL show the same empty state as the filters.
 
 ### Requirement: Sort
 The archive SHALL sort by newest (default), title A–Z (case- and accent-aware) or total time (ascending, recipes
-without time last).
+without time last). The control's options SHALL be labelled "Newest first", "Title A–Z" and "Total time".
 
 #### Scenario: Newest first by default
 - **WHEN** recipes are listed without a sort
@@ -204,6 +204,11 @@ without time last).
 #### Scenario: Sort choice in the archive
 - **WHEN** "Title A–Z" is chosen in the sort control
 - **THEN** the cards are in title order and the URL carries `sort=title`
+- **proof:** e2e
+
+#### Scenario: Total time label
+- **WHEN** the sort control's options are read
+- **THEN** they are "Newest first", "Title A–Z" and "Total time", and choosing "Total time" puts `sort=time` in the URL
 - **proof:** e2e
 
 ### Requirement: Favourites
