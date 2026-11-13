@@ -4,10 +4,14 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImageError } from '#lib/errors.ts';
 import { closeDb, getDb } from './db.ts';
 import { MAX_LONG_SIDE, MAX_UPLOAD_BYTES, TARGET_BYTES, getImage, storeImage, storeImageFromUrl } from './images.ts';
+
+// sharp encoding is CPU-bound and crawls on the shared CI runner; a test that times out also leaves its
+// in-flight store writing into the next test's database
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 beforeEach(() => {
 	process.env.DATABASE_PATH = join(mkdtempSync(join(tmpdir(), 'hub-images-')), 'i.db');
