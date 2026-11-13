@@ -6,10 +6,12 @@
 
 ## 2. Servings scaling
 
-> unit: depends=1 · files=src/lib/ingredients/scale.ts, src/lib/ingredients/scale.test.ts
+> unit: depends=1 · files=src/lib/ingredients/parse.ts, src/lib/ingredients/parse.test.ts, src/lib/ingredients/scale.ts, src/lib/ingredients/scale.test.ts
 
-- [ ] 2.1 Write tests "Scenario: Scaling a line doubles its quantity", "Scenario: Scaling rounds to two decimals", "Scenario: Lines without quantity and the recipe's own servings stay unchanged", "Scenario: Invalid scale target leaves the line unchanged" in `scale.test.ts`; plus unit and note ordering and the range upper-bound case from the design
-- [ ] 2.2 Implement `scaleIngredient` until the tests pass
+- [ ] 2.1 Write parser tests that a range (`2-3`, `2–3`, `1/2-1`) keeps both ends while the existing upper-bound quantity stays unchanged for other callers
+- [ ] 2.2 Extend the quantity parser in `parse.ts` to keep a range's lower bound; existing parse tests stay green
+- [ ] 2.3 Write tests "Scenario: Scaling a line doubles its quantity", "Scenario: Scaling rounds to two decimals", "Scenario: Lines without quantity and the recipe's own servings stay unchanged", "Scenario: Invalid scale target leaves the line unchanged" in `scale.test.ts`; plus unit and note ordering and "Scenario: Scaling a range scales both ends" (also a range with decimals and a rounded end)
+- [ ] 2.4 Implement `scaleIngredient` (scaling both ends of a range) until the tests pass
 
 ## 3. Draft storage
 

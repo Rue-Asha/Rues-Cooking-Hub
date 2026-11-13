@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Servings scaling on the recipe page
-The recipe page SHALL offer a servings control labelled "Scale to servings" (group "Scale recipe"), starting at the recipe's servings, with "Scale down" and "Scale up" (one serving each) and, while the value differs from the recipe's servings, "Reset to N servings". Values SHALL be whole numbers of at least 1; anything else SHALL NOT be applied and SHALL show "Servings must be at least 1". Scaling SHALL be a view only: it multiplies each ingredient line's quantity by chosen servings divided by the recipe's servings, shows "for N" with the chosen servings and updates without reload, stores nothing, resets on reload, and does not change the "Add to plan" default. A scaled line SHALL read quantity (at most two decimals, trailing zeros dropped), unit, name and note; a line without readable quantity SHALL stay unchanged; at the recipe's own servings every line SHALL show its original text. Steps, notes and times SHALL NOT be scaled.
+The recipe page SHALL offer a servings control labelled "Scale to servings" (group "Scale recipe"), starting at the recipe's servings, with "Scale down" and "Scale up" (one serving each) and, while the value differs from the recipe's servings, "Reset to N servings". Values SHALL be whole numbers of at least 1; anything else SHALL NOT be applied and SHALL show "Servings must be at least 1". Scaling SHALL be a view only: it multiplies each ingredient line's quantity by chosen servings divided by the recipe's servings, shows "for N" with the chosen servings and updates without reload, stores nothing, resets on reload, and does not change the "Add to plan" default. A scaled line SHALL read quantity (at most two decimals, trailing zeros dropped), unit, name and note; a range line SHALL keep both ends and scale both; a line without readable quantity SHALL stay unchanged; at the recipe's own servings every line SHALL show its original text. Steps, notes and times SHALL NOT be scaled.
 
 #### Scenario: Scaling a line doubles its quantity
 - **WHEN** the line "200 g flour" of a 2-serving recipe is scaled to 4 servings
@@ -11,6 +11,11 @@ The recipe page SHALL offer a servings control labelled "Scale to servings" (gro
 #### Scenario: Scaling rounds to two decimals
 - **WHEN** "1 cup milk" of a 3-serving recipe is scaled to 1 serving
 - **THEN** it reads "0.33 cup milk"
+- **proof:** unit
+
+#### Scenario: Scaling a range scales both ends
+- **WHEN** the line "2-3 cloves garlic" of a 2-serving recipe is scaled to 4 servings
+- **THEN** it reads "4–6 cloves garlic"
 - **proof:** unit
 
 #### Scenario: Lines without quantity and the recipe's own servings stay unchanged
