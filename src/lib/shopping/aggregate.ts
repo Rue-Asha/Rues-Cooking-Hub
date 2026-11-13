@@ -1,4 +1,5 @@
 import { readQuantity } from '../ingredients/parse.ts';
+import { shownQuantity } from '../ingredients/scale.ts';
 import { fold } from '../text.ts';
 import type { Amount, ParsedLine } from '../types.ts';
 
@@ -69,8 +70,6 @@ export function nameKey(name: string): string {
 	else if (word.endsWith('s') && !/(ss|us|is)$/.test(word)) single = word.slice(0, -1);
 	return folded.slice(0, at) + single;
 }
-
-const shownQuantity = (n: number) => String(Number(n.toFixed(2)));
 
 // "1 cup + 200 g", "1.5 kg", ""
 export function formatAmounts(amounts: Amount[]): string {

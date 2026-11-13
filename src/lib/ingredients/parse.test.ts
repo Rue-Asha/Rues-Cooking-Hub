@@ -60,6 +60,7 @@ describe('Scenario: Range uses the upper bound', () => {
 		expect(parseIngredient('2-3 cloves garlic')).toEqual({
 			text: '2-3 cloves garlic',
 			quantity: 3,
+			quantityMin: 2,
 			unit: 'clove',
 			name: 'garlic',
 			note: null
@@ -167,5 +168,21 @@ describe('Scenario: Unparseable line becomes the name', () => {
 
 	it('survives an empty line', () => {
 		expect(parseIngredient('')).toEqual({ text: '', quantity: null, unit: null, name: '', note: null });
+	});
+});
+
+describe('Scenario: Range keeps both ends', () => {
+	it('sets quantityMin to the lower bound and quantity to the upper bound', () => {
+		const lines = ['2-3 cloves garlic', '2–3 cloves garlic', '1/2-1 cup milk'].map(parseIngredient);
+
+		expect(lines.map((l) => [l.quantityMin, l.quantity])).toEqual([
+			[2, 3],
+			[2, 3],
+			[0.5, 1]
+		]);
+	});
+
+	it('leaves quantityMin unset for a single quantity', () => {
+		expect(parseIngredient('2 tbsp olive oil').quantityMin).toBeUndefined();
 	});
 });
