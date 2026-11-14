@@ -4,9 +4,11 @@ import { open, reset, seed, type SeedInput } from './helpers.ts';
 type Recorded = { calls: { named: number; inCard: number; inStack: number }[]; hero: string };
 
 const stack = (page: Page) => page.getByRole('region', { name: 'Featured' });
-const front = (page: Page) => stack(page).locator('[data-front]');
-const counter = (page: Page) => front(page).locator('.counter');
-const stage = (page: Page) => stack(page).locator('[data-stage]');
+// the cards behind the front one are aria-hidden, so the one exposed link is the front card
+const front = (page: Page) => stack(page).getByRole('link');
+const cards = (page: Page) => stack(page).getByRole('link', { includeHidden: true });
+const counter = (page: Page) => front(page).getByText(/^\d\d\/\d\d$/);
+const stage = (page: Page) => stack(page).getByRole('group', { name: 'Featured recipes' });
 const grid = (page: Page) => page.getByRole('list', { name: 'Recipes' });
 
 // Recipe 1 is the oldest; createdAt follows the number
@@ -28,7 +30,7 @@ test('Scenario: Featured stack shows the seven newest', async ({ page, request }
 
 	await expect(counter(page)).toHaveText('01/07');
 	await expect(front(page)).toContainText('Recipe 9');
-	await expect(stack(page).locator('[data-card]')).toHaveCount(7);
+	await expect(cards(page)).toHaveCount(7);
 	await expect(stack(page).getByText('Recipe 2', { exact: true })).toHaveCount(0);
 });
 
@@ -106,7 +108,7 @@ test('Scenario: Featured stack ignores the filters', async ({ page, request }) =
 
 	await expect(counter(page)).toHaveText('01/07');
 	await expect(front(page)).toContainText('Recipe 9');
-	await expect(stack(page).locator('[data-card]')).toHaveCount(7);
+	await expect(cards(page)).toHaveCount(7);
 });
 
 test('A featured card carries its photo into the recipe page', async ({ page, request }) => {
@@ -122,8 +124,8 @@ test('A featured card carries its photo into the recipe page', async ({ page, re
 			const named = [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).viewTransitionName === w.hero);
 			w.calls.push({
 				named: named.length,
-				inCard: named.filter((el) => el.closest('.card')).length,
-				inStack: named.filter((el) => el.closest('[data-stage]')).length
+				inCard: named.filter((el) => el.closest('article')).length,
+				inStack: named.filter((el) => el.closest('[aria-roledescription="carousel"]')).length
 			});
 			return start(...args);
 		}) as typeof document.startViewTransition;

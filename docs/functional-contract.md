@@ -464,13 +464,16 @@ Strings in the UI that the e2e suite does not match, but which are part of this 
 
 ## 7. Behavioral `data-*` allow-list
 
-Rule: only attributes that express state that has no accessible equivalent. Everything else the suite currently uses (`data-entry`, `data-day`, `data-slot`, `data-date`, `data-today`, `data-recipe`, `data-recipe-info`, `data-hero`, `data-tile`, `data-nav`, `data-column`, `data-card`, `data-front`, `data-stage`, `data-open`, `data-strike`, `data-part`, `data-image-frame`, `data-page-header`, `data-section-heading`, `data-weekday`, `data-title`, `data-times`, `data-dragging`, `data-reading-sweep`, `data-shot-bottom`) is NOT allow-listed: those are structural or styling hooks and must be replaced in the tests by roles, labels, names, text or `aria-current` (for example today's day via `aria-current="date"`, the currently shown Featured recipe via `aria-current`, a check state via the checkbox role).
+Rule: only attributes that express state that has no accessible equivalent. Everything else the suite currently uses (`data-entry`, `data-day`, `data-slot`, `data-date`, `data-today`, `data-recipe`, `data-recipe-info`, `data-hero`, `data-tile`, `data-nav`, `data-card`, `data-front`, `data-stage`, `data-open`, `data-strike`, `data-part`, `data-image-frame`, `data-weekday`, `data-title`, `data-times`, `data-dragging`, `data-reading-sweep`, `data-shot-bottom`) is NOT allow-listed: those are structural or styling hooks and must be replaced in the tests by roles, labels, names, text or `aria-current` (for example today's day via `aria-current="date"`, the currently shown Featured recipe via `aria-current`, a check state via the checkbox role).
 
 | attribute | what it signals | why no role or label covers it |
 |---|---|---|
 | `data-hydrated` (on the document element) | The client app has booted, so event handlers and enhanced forms are live. | Pure readiness of the page's scripts; no ARIA state means "scripts attached". Tests wait on it before interacting. |
 | `data-drop-target` (on a plan slot) | During a drag, this slot is the one the dragged recipe or entry would drop into. | Transient pointer-drag state; the only ARIA drag attributes (`aria-dropeffect`, `aria-grabbed`) are deprecated and unsupported. |
 | `data-compact` (on the navigation) | The page is scrolled more than 48 px; the navigation is in its scrolled state. | Scroll-derived state of a landmark; no ARIA attribute expresses it. |
+| `data-column` (on a content column) | The edges of the page's content column, which the page header and every section heading must line up with, centred in the viewport at a bounded width. | Alignment is layout geometry; a generic container has no role or name to find it by. |
+| `data-page-header` (on the page header block) | The page's header block, which must start at the content column's left edge. | The header's position is what is measured; a generic container has no role or name, and the page `h1` may sit inside a panel that is inset on purpose. |
+| `data-section-heading` (on a section heading) | A section heading that must start at the content column's left edge. | Headings inside panels or second columns are inset on purpose and carry the same role, so only the column-level ones need marking. |
 
 ## 8. Route coverage check
 

@@ -28,7 +28,7 @@ test('Scenario: Mark visited from the spot page', async ({ page, request }) => {
 	await sheet(page).getByLabel('Score').fill('8,75');
 	await sheet(page).getByRole('button', { name: 'Save' }).click();
 
-	await expect(page.locator('[data-spot-info]').getByText('8.75', { exact: true })).toBeVisible();
+	await expect(page.getByRole('main').getByText('8.75', { exact: true })).toBeVisible();
 	await expect(page.getByRole('dialog')).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Mark visited' })).toHaveCount(0);
 	expect(stored(spots[0])).toEqual({ status: 'visited', score: 875 });

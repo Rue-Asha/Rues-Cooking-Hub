@@ -59,7 +59,7 @@ test('Scenario: Phone page carries Add spot', async ({ page, request }, info) =>
 	await seed(request, { spots: [{ name: 'Delta' }] });
 	await open(page, '/eating-out');
 
-	const add = page.locator('[data-column] header').getByRole('link', { name: 'Add spot' });
+	const add = page.getByRole('main').getByRole('link', { name: 'Add spot' });
 	await expect(add).toBeVisible();
 	await expect(add).toHaveAttribute('href', '/eating-out/new');
 });

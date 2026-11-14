@@ -93,16 +93,17 @@ test('Scenario: Parse preview updates while typing', async ({ page }) => {
 
 	await line.pressSequentially('200g');
 
-	await expect(preview.locator('[data-part=quantity]')).toHaveText('200');
-	await expect(preview.locator('[data-part=unit]')).toHaveText('g');
-	await expect(preview.locator('[data-part=name]')).toHaveCount(0);
+	await expect(preview.getByText('200', { exact: true })).toBeVisible();
+	await expect(preview.getByText('g', { exact: true })).toBeVisible();
+	await expect(preview).toHaveText(/^\s*200\s*g\s*$/);
 
 	await line.pressSequentially(' butter, softened');
 
-	await expect(preview.locator('[data-part=quantity]')).toHaveText('200');
-	await expect(preview.locator('[data-part=unit]')).toHaveText('g');
-	await expect(preview.locator('[data-part=name]')).toHaveText('butter');
-	await expect(preview.locator('[data-part=note]')).toHaveText('softened');
+	await expect(preview.getByText('200', { exact: true })).toBeVisible();
+	await expect(preview.getByText('g', { exact: true })).toBeVisible();
+	await expect(preview.getByText('butter', { exact: true })).toBeVisible();
+	await expect(preview.getByText('softened', { exact: true })).toBeVisible();
+	await expect(preview).toHaveText(/^\s*200\s*g\s*butter\s*softened\s*$/);
 });
 
 test('a line without quantity says so in its preview, and an empty line has none', async ({ page }) => {
@@ -112,8 +113,8 @@ test('a line without quantity says so in its preview, and an empty line has none
 
 	await expect(preview).toHaveCount(0);
 	await line.fill('salt to taste');
-	await expect(preview.locator('[data-part=name]')).toHaveText('salt to taste');
-	await expect(preview.locator('[data-part=no-amount]')).toBeVisible();
+	await expect(preview.getByText('salt to taste', { exact: true })).toBeVisible();
+	await expect(preview.getByText('no amount', { exact: true })).toBeVisible();
 	await line.fill('');
 	await expect(preview).toHaveCount(0);
 });

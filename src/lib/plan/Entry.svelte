@@ -79,6 +79,8 @@
 <div
 	class="entry"
 	class:text={!entry.recipe}
+	role="group"
+	aria-label={title}
 	data-entry={entry.id}
 	data-menu-open={mode !== 'closed' ? '' : undefined}
 	data-dragging={dragging ? '' : undefined}

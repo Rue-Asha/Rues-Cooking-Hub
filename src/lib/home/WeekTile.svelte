@@ -24,7 +24,7 @@
 	<ol class="days">
 		{#each week as d, i (d.date)}
 			{@const entry = shown(d.entries)}
-			<li data-day={d.date} data-today={d.date === today ? '' : undefined} style:--i={i}>
+			<li data-day={d.date} data-today={d.date === today ? '' : undefined} aria-current={d.date === today ? 'date' : undefined} style:--i={i}>
 				<span class="wd" data-weekday>{weekday(d.date)}</span>
 				<span class="num tnum">{Number(d.date.slice(8))}</span>
 				<span class="thumb" class:filled={entry}>

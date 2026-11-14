@@ -1,8 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { open, reset, seed, setToday } from './helpers.ts';
-
-const slot = (page: Page, date: string, id: string) => page.locator(`[data-date="${date}"][data-slot="${id}"]`);
-const entries = (page: Page, date: string, id: string) => slot(page, date, id).locator('[data-entry]');
+import { allEntries, entries, open, reset, seed, setToday, slot } from './helpers.ts';
 
 test.beforeEach(async ({ request }) => {
 	await reset(request);
@@ -34,7 +31,7 @@ test('Scenario: Copy the previous week', async ({ page, request }) => {
 	await expect(entries(page, '2026-10-21', 'lunch')).toHaveCount(1);
 	await expect(slot(page, '2026-10-21', 'lunch').getByText('4 servings')).toBeAttached();
 	await page.reload();
-	await expect(page.locator('[data-entry]')).toHaveCount(2);
+	await expect(allEntries(page)).toHaveCount(2);
 });
 
 test('Scenario: Copy into a week with entries asks first', async ({ page, request }) => {
@@ -58,9 +55,9 @@ test('Scenario: Nothing to copy', async ({ page, request }) => {
 	const dialog = await openCopy(page);
 	await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
 	await expect(dialog.getByText('Nothing to copy')).toBeVisible();
-	await expect(page.locator('[data-entry]')).toHaveCount(1);
+	await expect(allEntries(page)).toHaveCount(1);
 	await page.reload();
-	await expect(page.locator('[data-entry]')).toHaveCount(1);
+	await expect(allEntries(page)).toHaveCount(1);
 });
 
 test('Copy week can pick an earlier source week', async ({ page, request }) => {

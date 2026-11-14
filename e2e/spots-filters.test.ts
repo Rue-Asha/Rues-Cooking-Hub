@@ -20,7 +20,7 @@ test('Scenario: Stale filter values are ignored', async ({ page, request }) => {
 	await page.locator('html[data-hydrated]').waitFor({ state: 'attached' });
 
 	await expect(cards(page)).toHaveText(['Alpha', 'Beta']);
-	await expect(filters(page).locator('[aria-pressed="true"]')).toHaveCount(0);
+	await expect(filters(page).getByRole('button', { pressed: true })).toHaveCount(0);
 	await expect(page.getByLabel('City')).toHaveValue('');
 });
 
@@ -127,7 +127,7 @@ test('Scenario: Search spots focuses the spot search', async ({ page, request },
 
 	test.skip(info.project.name !== 'desktop');
 	await open(page, '/eating-out');
-	await expect(page.locator('body')).toBeFocused();
+	await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
 	await page.getByRole('link', { name: 'Search spots' }).click();
 	await expect(search(page)).toBeFocused();
 });
@@ -136,9 +136,9 @@ test('Scenario: Want to go offers no score sort', async ({ page, request }) => {
 	await reset(request);
 	await seed(request, { spots: [{ name: 'Alpha', status: 'visited', scoreHundredths: 900 }, { name: 'Beta' }] });
 	await open(page, '/eating-out');
-	await expect(page.getByLabel('Sort spots').locator('option')).toHaveText(['Highest score', 'Newest first', 'Name A–Z']);
+	await expect(page.getByLabel('Sort spots').getByRole('option')).toHaveText(['Highest score', 'Newest first', 'Name A–Z']);
 
 	await segment(page, /^Want to go/).click();
 
-	await expect(page.getByLabel('Sort spots').locator('option')).toHaveText(['Newest first', 'Name A–Z']);
+	await expect(page.getByLabel('Sort spots').getByRole('option')).toHaveText(['Newest first', 'Name A–Z']);
 });

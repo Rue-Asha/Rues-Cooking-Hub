@@ -117,7 +117,7 @@ test('Scenario: Spot photo errors match the recipe form', async ({ page, baseURL
 	const posts: string[] = [];
 
 	await page
-		.locator('input[type=file]')
+		.getByLabel('Photo file')
 		.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a picture') });
 	await save(page);
 	await expect(page.getByText("That file isn't an image")).toBeVisible();
@@ -125,7 +125,7 @@ test('Scenario: Spot photo errors match the recipe form', async ({ page, baseURL
 	expect(spotCount()).toBe(0);
 
 	page.on('request', (r) => r.method() === 'POST' && posts.push(r.url()));
-	await page.locator('input[type=file]').setInputFiles({
+	await page.getByLabel('Photo file').setInputFiles({
 		name: 'huge.jpg',
 		mimeType: 'image/jpeg',
 		buffer: Buffer.alloc(16 * 1024 * 1024)

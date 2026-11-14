@@ -11,10 +11,10 @@ const settle = (page: Page) =>
 	page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
 
 // the strike line is drawn across the name, so a struck name has a line as wide as itself
-const struck = (row: Locator) =>
-	row.locator('[data-strike]').evaluate((line) => {
-		const text = line.parentElement!.getBoundingClientRect();
-		return line.getBoundingClientRect().width >= text.width * 0.95 && getComputedStyle(line).opacity !== '0';
+const struck = (row: Locator, name: string) =>
+	row.getByText(name, { exact: true }).evaluate((text) => {
+		const line = text.firstElementChild!;
+		return line.getBoundingClientRect().width >= text.getBoundingClientRect().width * 0.95 && getComputedStyle(line).opacity !== '0';
 	});
 
 const items = {
@@ -35,8 +35,8 @@ test('Scenario: Check off moves the item to Checked', async ({ page, request }) 
 	await expect(box(toBuy(page), 'milk')).toHaveCount(0);
 	await expect(page.getByRole('region').last()).toHaveAccessibleName(/^Checked/);
 	await settle(page);
-	expect(await struck(rowIn(checkedSection(page), 'milk'))).toBe(true);
-	expect(await struck(rowIn(toBuy(page), 'bread'))).toBe(false);
+	expect(await struck(rowIn(checkedSection(page), 'milk'), 'milk')).toBe(true);
+	expect(await struck(rowIn(toBuy(page), 'bread'), 'bread')).toBe(false);
 
 	await page.reload();
 	await page.locator('html[data-hydrated]').waitFor({ state: 'attached' });
@@ -60,7 +60,7 @@ test('Scenario: Uncheck restores the item', async ({ page, request }) => {
 	await expect(box(dairy, 'milk')).toHaveAttribute('aria-checked', 'false');
 	await expect(box(checkedSection(page), 'milk')).toHaveCount(0);
 	await settle(page);
-	expect(await struck(rowIn(dairy, 'milk'))).toBe(false);
+	expect(await struck(rowIn(dairy, 'milk'), 'milk')).toBe(false);
 
 	await page.reload();
 	await page.locator('html[data-hydrated]').waitFor({ state: 'attached' });
@@ -129,5 +129,5 @@ test('Check-off slides the item into Checked', async ({ page, request }) => {
 		);
 	await expect.poll(flying, { intervals: [10], timeout: 3000 }).toBe(true);
 	await settle(page);
-	expect(await struck(rowIn(checkedSection(page), 'milk'))).toBe(true);
+	expect(await struck(rowIn(checkedSection(page), 'milk'), 'milk')).toBe(true);
 });

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
-import { open, reset, seed } from './helpers.ts';
+import { mainNav, open, reset, seed } from './helpers.ts';
 
 const port = Number(process.env.PORT ?? 4173);
 
@@ -46,7 +46,7 @@ test('Scenario: Spot created with all fields', async ({ page }) => {
 	await page.getByLabel('Address').fill('Oranienstraße 42, 10999 Berlin');
 	await page.getByLabel('Website').fill('https://kuro-ramen.example');
 	await page.getByLabel('Notes').fill('Spicy miso with the extra egg.');
-	await page.locator('input[type=file]').setInputFiles(await jpeg());
+	await page.getByLabel('Photo file').setInputFiles(await jpeg());
 	await page.getByRole('button', { name: 'Save spot' }).last().click();
 
 	await expect(page).toHaveURL(/\/eating-out\/\d+$/);
@@ -67,7 +67,7 @@ test('Scenario: Spot created with all fields', async ({ page }) => {
 	await expect(page.getByLabel('Address')).toHaveValue('Oranienstraße 42, 10999 Berlin');
 	await expect(page.getByLabel('Website')).toHaveValue('https://kuro-ramen.example');
 	await expect(page.getByLabel('Notes')).toHaveValue('Spicy miso with the extra egg.');
-	await expect(page.locator('[data-image-frame] img:not([role])')).toHaveAttribute('src', `/images/${stored.image_id}`);
+	await expect(page.getByRole('presentation')).toHaveAttribute('src', `/images/${stored.image_id}`);
 });
 
 test('Scenario: New spot defaults to Want to go', async ({ page }) => {
@@ -146,8 +146,8 @@ test('Spot form screenshot', async ({ page }, info) => {
 	await price(page, '€€').click();
 	await page.getByLabel('City').fill('Berlin');
 	await page.getByLabel('Neighbourhood').fill('Kreuzberg');
-	await page.locator('input[type=file]').setInputFiles(await jpeg());
-	await expect(page.locator('[data-image-frame] img')).toBeVisible();
+	await page.getByLabel('Photo file').setInputFiles(await jpeg());
+	await expect(page.getByRole('presentation')).toBeVisible();
 	await page.evaluate(async () => {
 		await Promise.all([...document.images].map((img) => img.decode().catch(() => undefined)));
 		await Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined)));
@@ -155,7 +155,7 @@ test('Spot form screenshot', async ({ page }, info) => {
 		window.scrollTo(0, 0);
 	});
 	// a full-page shot would leave the fixed phone tab bar half-way down the image; hide it
-	await page.addStyleTag({ content: '[data-nav="bar"] { display: none !important }' });
+	if (info.project.name === 'phone') await mainNav(page).evaluate((n) => (n.style.display = 'none'));
 
 	const path = `test-results/shots/eating-out-form-${info.project.name}.png`;
 	await page.screenshot({ path, fullPage: true, animations: 'disabled' });

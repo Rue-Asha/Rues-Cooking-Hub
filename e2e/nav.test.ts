@@ -1,21 +1,22 @@
-import { expect, test, type Page } from '@playwright/test';
-import { calm, open } from './helpers.ts';
+import { expect, test, type ElementHandle, type Page } from '@playwright/test';
+import { calm, mainNav as nav, navPill, open } from './helpers.ts';
 
 const paths = ['/', '/recipes', '/plan', '/list', '/eating-out'];
 const labels = ['Home', 'Recipes', 'Plan', 'List', 'Eating Out'];
 
 // the areas are still placeholders, so long-page checks bring their own content
 async function makeLong(page: Page) {
-	await page.evaluate(() => {
+	await page.getByRole('main').evaluate((main) => {
 		const block = document.createElement('div');
 		block.id = 'tall';
 		block.style.blockSize = '2400px';
 		block.style.background = 'var(--sand)';
-		document.querySelector('main')!.append(block);
+		main.append(block);
 	});
 }
 
-const nav = (page: Page) => page.getByRole('navigation', { name: 'Main' });
+// both navs stay in the document, only the one for this width is shown
+const bothNavs = (page: Page) => page.getByRole('navigation', { name: 'Main', includeHidden: true });
 
 test('Scenario: Desktop shows the top pill nav', async ({ page }, info) => {
 	test.skip(info.project.name !== 'desktop', 'desktop layout');
@@ -25,11 +26,9 @@ test('Scenario: Desktop shows the top pill nav', async ({ page }, info) => {
 		await expect(nav(page).getByRole('link')).toHaveText(labels);
 		const box = (await nav(page).boundingBox())!;
 		expect(box.y, path).toBeLessThan(40);
-		await expect(page.locator('[data-nav="bar"]')).toBeHidden();
-		await expect(page.locator('[data-nav="top"]')).toBeVisible();
+		await expect(bothNavs(page)).toHaveCount(2);
 		const content = await page
-			.locator('main')
-			.first()
+			.getByRole('main')
 			.evaluate((m) => m.getBoundingClientRect().top + parseFloat(getComputedStyle(m).paddingTop));
 		expect(content, `${path} content starts below the nav`).toBeGreaterThan(box.y + box.height);
 	}
@@ -45,8 +44,7 @@ test('Scenario: Phone shows the bottom tab bar', async ({ page }, info) => {
 		const box = (await nav(page).boundingBox())!;
 		expect(box.y + box.height, path).toBeGreaterThan(height - 40);
 		expect(box.y + box.height, path).toBeLessThanOrEqual(height);
-		await expect(page.locator('[data-nav="top"]')).toBeHidden();
-		await expect(page.locator('[data-nav="bar"]')).toBeVisible();
+		await expect(bothNavs(page)).toHaveCount(2);
 	}
 });
 
@@ -55,14 +53,14 @@ test('Scenario: Nav marks the open area', async ({ page }) => {
 	const current = nav(page).locator('[aria-current="page"]');
 	await expect(current).toHaveCount(1);
 	await expect(current).toHaveText('Plan');
-	await expect(page.locator('[aria-current]')).toHaveCount(2);
-	await expect(page.locator('[aria-current]').filter({ hasNotText: 'Plan' })).toHaveCount(0);
+	await expect(page.locator('[aria-current="page"]')).toHaveCount(2);
+	await expect(page.locator('[aria-current="page"]').filter({ hasNotText: 'Plan' })).toHaveCount(0);
 
 	await open(page, '/eating-out');
 	await expect(current).toHaveCount(1);
 	await expect(current).toHaveText('Eating Out');
-	await expect(page.locator('[aria-current]')).toHaveCount(2);
-	await expect(page.locator('[aria-current]').filter({ hasNotText: 'Eating Out' })).toHaveCount(0);
+	await expect(page.locator('[aria-current="page"]')).toHaveCount(2);
+	await expect(page.locator('[aria-current="page"]').filter({ hasNotText: 'Eating Out' })).toHaveCount(0);
 });
 
 for (const size of [
@@ -78,9 +76,8 @@ for (const size of [
 		await makeLong(page);
 		await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
 		await expect(nav(page)).toHaveCount(1);
-		const visible = await page.locator('[data-nav]').evaluateAll((els) => els.filter((e) => e.checkVisibility()).length);
-		expect(visible).toBe(1);
-		await expect(page.locator('[data-nav="bar"]')).toBeVisible();
+		await expect(bothNavs(page)).toHaveCount(2);
+		await expect(nav(page)).toBeVisible();
 		await expect
 			.poll(() => page.evaluate(() => window.scrollY + innerHeight >= document.documentElement.scrollHeight - 1))
 			.toBe(true);
@@ -101,27 +98,35 @@ test('Scenario: Nav shrinks on scroll', async ({ page }) => {
 });
 
 // scrolls first when asked, then measures two frames later
-const barState = (page: Page, scrollTo?: number) =>
-	nav(page).evaluate(async (n, scrollTo) => {
+const barState = async (page: Page, scrollTo?: number) => {
+	const links = nav(page).getByRole('link');
+	const parts = {
+		bar: await nav(page).elementHandle(),
+		links: (await links.elementHandles()) as ElementHandle<HTMLElement>[],
+		labels: await Promise.all(labels.map((label, i) => links.nth(i).getByText(label, { exact: true }).elementHandle())),
+		icons: await Promise.all(labels.map((_, i) => links.nth(i).locator('svg').elementHandle())),
+		pill: await navPill(nav(page)),
+		marked: await nav(page).locator('[aria-current="page"]').elementHandle()
+	};
+	return page.evaluate(async ({ parts, scrollTo }) => {
 		if (scrollTo !== undefined) {
 			window.scrollTo(0, scrollTo);
 			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 		}
-		const links = [...n.querySelectorAll('a')];
-		const pill = n.querySelector<HTMLElement>('.pill')!;
-		const marked = n.querySelector('[aria-current="page"]')!.getBoundingClientRect();
-		const covered = pill.getBoundingClientRect();
+		const marked = parts.marked!.getBoundingClientRect();
+		const covered = parts.pill.getBoundingClientRect();
 		return {
-			width: n.getBoundingClientRect().width,
-			pill: Number(getComputedStyle(pill).opacity) === 1 && Math.abs(covered.left - marked.left) < 1 && Math.abs(covered.width - marked.width) < 1,
-			labels: links.map((a) => Number(getComputedStyle(a.querySelector('span')!).opacity)),
-			offsets: links.map((a) => {
-				const icon = a.querySelector('svg')!.getBoundingClientRect();
+			width: parts.bar!.getBoundingClientRect().width,
+			pill: Number(getComputedStyle(parts.pill).opacity) === 1 && Math.abs(covered.left - marked.left) < 1 && Math.abs(covered.width - marked.width) < 1,
+			labels: parts.labels.map((l) => Number(getComputedStyle(l!).opacity)),
+			offsets: parts.links.map((a, i) => {
+				const icon = parts.icons[i]!.getBoundingClientRect();
 				const link = a.getBoundingClientRect();
 				return Math.abs(icon.top + icon.height / 2 - (link.top + link.height / 2));
 			})
 		};
-	}, scrollTo);
+	}, { parts, scrollTo });
+};
 
 const settled = (page: Page) => page.waitForFunction(() => document.getAnimations().length === 0);
 
@@ -147,11 +152,11 @@ for (const size of [
 		expect(compact.pill, 'the open area keeps its pill').toBe(true);
 		for (const offset of compact.offsets) expect(offset).toBeLessThan(2);
 		for (const label of labels) await expect(nav(page).getByRole('link', { name: label, exact: true })).toBeVisible();
-		const fit = await nav(page).evaluate((n) => ({
-			list: n.querySelector('ul')!.scrollWidth <= n.querySelector('ul')!.clientWidth,
-			bar: n.scrollWidth <= n.clientWidth,
-			small: [...n.querySelectorAll('a')].map((a) => a.getBoundingClientRect()).filter((r) => r.width < 44 || r.height < 44).length
-		}));
+		const fit = {
+			list: await nav(page).getByRole('list').evaluate((l) => l.scrollWidth <= l.clientWidth),
+			bar: await nav(page).evaluate((n) => n.scrollWidth <= n.clientWidth),
+			small: await nav(page).getByRole('link').evaluateAll((as) => as.map((a) => a.getBoundingClientRect()).filter((r) => r.width < 44 || r.height < 44).length)
+		};
 		expect(fit).toEqual({ list: true, bar: true, small: 0 });
 
 		await page.evaluate(() => window.scrollTo(0, 0));
