@@ -78,18 +78,18 @@ Homelab-Managment before the PR, and the Homelab service change after tag v0.1.0
 - **THEN** it lists each outward step above in order, each with ⚠ and the exact command or setting
 - **proof:** manual (documentation; checked by reading the file at Gate 2)
 
-### Requirement: Version 0.2.0
-`package.json` and `package-lock.json` SHALL carry version 0.2.0 (a minor bump for the Eating Out feature). After the
-change is merged, tag `v0.2.0` SHALL be pushed so the release workflow publishes `rues-cooking-hub-0.2.0.tgz` with its
+### Requirement: Version 0.3.0
+`package.json` and `package-lock.json` SHALL carry version 0.3.0 (a minor bump for the gate-1-decisions feature). After the
+change is merged, tag `v0.3.0` SHALL be pushed so the release workflow publishes `rues-cooking-hub-0.3.0.tgz` with its
 sha256.
 
-#### Scenario: Package and lockfile carry 0.2.0
+#### Scenario: Package and lockfile carry 0.3.0
 - **WHEN** `package.json` and `package-lock.json` (root and `packages[""]`) are read
-- **THEN** all three versions are "0.2.0"
+- **THEN** all three versions are "0.3.0"
 - **proof:** unit
 
-#### Scenario: Release v0.2.0 published
-- **WHEN** tag `v0.2.0` is pushed on the merged `main`
-- **THEN** the release workflow passes `check-tag` and a GitHub release v0.2.0 holds `rues-cooking-hub-0.2.0.tgz` and its `.sha256`
+#### Scenario: Release v0.3.0 published
+- **WHEN** tag `v0.3.0` is pushed on the merged `main`
+- **THEN** the release workflow passes `check-tag` and a GitHub release v0.3.0 holds `rues-cooking-hub-0.3.0.tgz` and its `.sha256`
 - **proof:** manual (runs on GitHub after the ship-time tag push)
 
