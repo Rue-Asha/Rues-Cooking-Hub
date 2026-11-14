@@ -36,6 +36,9 @@ async function shared(page: Page, request: Parameters<typeof seed>[0], image: bo
 	await open(page, '/eating-out');
 	await page.getByRole('link', { name: /Target/ }).click();
 	await expect(page).toHaveURL(`/eating-out/${spots[1]}`);
+	// the card photos leave the DOM with the list
+	await expect(page.getByRole('article')).toHaveCount(0);
+	await expect(page.getByRole('heading', { level: 1, name: 'Target' })).toBeVisible();
 	return { id: spots[1], name };
 }
 

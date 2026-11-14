@@ -71,6 +71,9 @@ test('Scenario: Card and recipe page share the hero image', async ({ page, reque
 	await page.getByRole('list', { name: 'Recipes' }).getByRole('link', { name: 'Pumpkin soup' }).click();
 	await expect(page).toHaveURL(`/recipes/${recipes[1]}`);
 
+	// the card photos leave the DOM with the list, which leaves the page's one presentational image
+	await expect(page.getByRole('list', { name: 'Recipes' })).toHaveCount(0);
+	await expect(page.getByRole('heading', { level: 1, name: 'Pumpkin soup' })).toBeVisible();
 	expect(await calls(page)).toEqual([{ named: 1, inCard: 1 }]);
 	await expect.poll(() => photoName(page)).toBe(name);
 	expect(await named(page, name)).toBe(1);
