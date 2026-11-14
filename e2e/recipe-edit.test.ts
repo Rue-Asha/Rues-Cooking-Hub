@@ -83,7 +83,7 @@ test('saving an edit without touching the image keeps it and the favourite flag'
 	const { recipes } = await seed(request, { recipes: [{ title: 'Soup', image: true, favourite: true }] });
 	const before = rows<{ image_id: number }>(`SELECT image_id FROM recipes WHERE id = ${recipes[0]}`)[0].image_id;
 	await open(page, `/recipes/${recipes[0]}/edit`);
-	await expect(page.locator('[data-image-frame] img:not([role])')).toHaveAttribute('src', `/images/${before}`);
+	await expect(page.getByRole('presentation')).toHaveAttribute('src', `/images/${before}`);
 
 	await page.getByLabel('Title', { exact: true }).fill('Soup of the day');
 	await page.getByRole('button', { name: 'Save recipe' }).click();

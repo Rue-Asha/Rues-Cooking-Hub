@@ -1,16 +1,20 @@
-import { expect, test, type Page } from '@playwright/test';
-import { open } from './helpers.ts';
+import { expect, test, type ElementHandle, type Page } from '@playwright/test';
+import { mainNav as nav, navDivider, navPill, open } from './helpers.ts';
 
-const nav = (page: Page) => page.getByRole('navigation', { name: 'Main' });
+const labels = ['Home', 'Recipes', 'Plan', 'List', 'Eating Out'];
+const dividerOf = (page: Page) => navDivider(nav(page));
 
 test('Scenario: Divider sits between List and Eating Out', async ({ page }) => {
 	await open(page, '/plan');
 	const links = nav(page).getByRole('link');
 	await expect(links).toHaveCount(5);
-	const divider = nav(page).locator('[data-divider]');
-	await expect(divider).toHaveCount(1);
+	const divider = dividerOf(page);
+	await expect(nav(page).getByRole('listitem', { includeHidden: true })).toHaveCount(6);
 	await expect(divider).toHaveAttribute('aria-hidden', 'true');
-	await expect(divider.locator('a, button, [tabindex]')).toHaveCount(0);
+	await expect(divider.getByRole('link', { includeHidden: true })).toHaveCount(0);
+	await expect(divider.getByRole('button', { includeHidden: true })).toHaveCount(0);
+	await expect(divider).not.toHaveAttribute('tabindex');
+	await expect(divider).toBeEmpty();
 	const [list, mid, out] = await Promise.all([
 		links.nth(3).boundingBox(),
 		divider.boundingBox(),
@@ -25,12 +29,12 @@ test('Scenario: Divider sits between List and Eating Out', async ({ page }) => {
 
 test('Scenario: Active pill lands on Eating Out', async ({ page }) => {
 	await open(page, '/eating-out');
-	const pillMatches = () =>
-		nav(page).evaluate((n) => {
-			const pill = n.querySelector('.pill')!.getBoundingClientRect();
-			const link = n.querySelector('[aria-current="page"]')!.getBoundingClientRect();
-			return { left: Math.abs(pill.left - link.left), width: Math.abs(pill.width - link.width), text: n.querySelector('[aria-current="page"]')!.textContent };
-		});
+	const pillMatches = async () => {
+		const pill = (await (await navPill(nav(page))).boundingBox())!;
+		const marked = nav(page).locator('[aria-current="page"]');
+		const link = (await marked.boundingBox())!;
+		return { left: Math.abs(pill.x - link.x), width: Math.abs(pill.width - link.width), text: await marked.textContent() };
+	};
 	await expect.poll(async () => (await pillMatches()).left).toBeLessThan(1);
 	const state = await pillMatches();
 	expect(state.width).toBeLessThan(1);
@@ -40,19 +44,17 @@ test('Scenario: Active pill lands on Eating Out', async ({ page }) => {
 test('Scenario: Active pill lands on Eating Out, scrolled', async ({ page }, info) => {
 	test.skip(info.project.name !== 'phone', 'tab bar layout');
 	await open(page, '/eating-out');
-	await page.evaluate(() => {
+	await page.getByRole('main').evaluate((main) => {
 		const block = document.createElement('div');
 		block.style.blockSize = '2400px';
-		document.querySelector('main')!.append(block);
+		main.append(block);
 		window.scrollTo(0, 200);
 	});
 	await expect(nav(page)).toHaveAttribute('data-compact', '');
 	await page.waitForFunction(() => document.getAnimations().length === 0);
-	const d = await nav(page).evaluate((n) => {
-		const pill = n.querySelector('.pill')!.getBoundingClientRect();
-		const link = n.querySelector('[aria-current="page"]')!.getBoundingClientRect();
-		return [Math.abs(pill.left - link.left), Math.abs(pill.width - link.width)];
-	});
+	const pill = (await (await navPill(nav(page))).boundingBox())!;
+	const link = (await nav(page).locator('[aria-current="page"]').boundingBox())!;
+	const d = [Math.abs(pill.x - link.x), Math.abs(pill.width - link.width)];
 	expect(d[0]).toBeLessThan(1);
 	expect(d[1]).toBeLessThan(1);
 });
@@ -65,19 +67,25 @@ for (const size of [
 		test.skip(info.project.name !== 'phone', 'tab bar layout, sets its own viewport');
 		await page.setViewportSize(size);
 		await open(page, '/eating-out');
-		const m = await nav(page).evaluate((n) => {
-			const list = n.querySelector('ul')!;
-			const links = [...n.querySelectorAll('a')];
-			const rects = links.map((a) => a.getBoundingClientRect());
-			return {
-				list: [list.scrollWidth, list.clientWidth],
-				doc: [document.documentElement.scrollWidth, document.documentElement.clientWidth],
-				labels: links.map((a) => [a.querySelector('span')!.scrollWidth, a.clientWidth, a.querySelector('span')!.textContent]),
-				overlap: rects.some((r, i) => i > 0 && r.left < rects[i - 1].right - 0.5),
-				small: rects.filter((r) => r.width < 44 || r.height < 44).length,
-				widths: rects.map((r) => Math.round(r.width * 10) / 10)
-			};
-		});
+		const links = nav(page).getByRole('link');
+		const m = await page.evaluate(
+			({ list, links, spans }) => {
+				const rects = links.map((a) => a.getBoundingClientRect());
+				return {
+					list: [list!.scrollWidth, list!.clientWidth],
+					doc: [document.documentElement.scrollWidth, document.documentElement.clientWidth],
+					labels: links.map((a, i) => [spans[i]!.scrollWidth, a.clientWidth, spans[i]!.textContent]),
+					overlap: rects.some((r, i) => i > 0 && r.left < rects[i - 1].right - 0.5),
+					small: rects.filter((r) => r.width < 44 || r.height < 44).length,
+					widths: rects.map((r) => Math.round(r.width * 10) / 10)
+				};
+			},
+			{
+				list: await nav(page).getByRole('list').elementHandle(),
+				links: (await links.elementHandles()) as ElementHandle<HTMLElement>[],
+				spans: await Promise.all(labels.map((label, i) => links.nth(i).getByText(label, { exact: true }).elementHandle()))
+			}
+		);
 		console.log(JSON.stringify(m));
 		expect(m.list[0]).toBeLessThanOrEqual(m.list[1]);
 		expect(m.doc[0]).toBeLessThanOrEqual(m.doc[1]);
@@ -89,14 +97,11 @@ for (const size of [
 
 test('mockup nav shows Eating Out after the divider', async ({ page }) => {
 	await open(page, '/__mockups/home');
-	await expect(nav(page).getByRole('link')).toHaveText(['Home', 'Recipes', 'Plan', 'List', 'Eating Out']);
-	await expect(nav(page).locator('[data-divider]')).toHaveCount(1);
+	await expect(nav(page).getByRole('link')).toHaveText(labels);
+	await expect(nav(page).getByRole('listitem', { includeHidden: true })).toHaveCount(6);
 	const links = nav(page).getByRole('link');
-	const [list, mid, out] = await Promise.all([
-		links.nth(3).boundingBox(),
-		nav(page).locator('[data-divider]').boundingBox(),
-		links.nth(4).boundingBox()
-	]);
+	const divider = dividerOf(page);
+	const [list, mid, out] = await Promise.all([links.nth(3).boundingBox(), divider.boundingBox(), links.nth(4).boundingBox()]);
 	expect(mid!.x).toBeGreaterThanOrEqual(list!.x + list!.width - 1);
 	expect(mid!.x + mid!.width).toBeLessThanOrEqual(out!.x + 1);
 });

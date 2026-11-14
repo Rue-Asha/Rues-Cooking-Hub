@@ -95,8 +95,10 @@ test('Reduced motion keeps the progress text without the sweep', async ({ page }
 	await importIt(page, '/pages/lemon-tart.html?delay=900');
 
 	await expect(page.getByRole('status').filter({ hasText: 'Reading the page…' })).toBeVisible();
-	const sweep = page.locator('[data-reading-sweep]');
-	expect(await sweep.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+	const running = await page.evaluate(
+		() => document.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSTransition)).length
+	);
+	expect(running).toBe(0);
 });
 
 const save = (page: import('@playwright/test').Page) =>

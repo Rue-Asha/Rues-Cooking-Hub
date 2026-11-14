@@ -1,13 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { open, reset, seed, setToday } from './helpers.ts';
+import { allEntries, entries, open, reset, seed, setToday, slot } from './helpers.ts';
 
 const MONDAY = '2026-10-19';
 const THURSDAY = '2026-10-22';
 const FRIDAY = '2026-10-23';
 
-const slot = (page: Page, date: string, id: string) => page.locator(`[data-date="${date}"][data-slot="${id}"]`);
-// an entry that is gliding out is hidden from the role tree, so its title is only counted while it is visible
-const titles = (page: Page, date: string, id: string) => slot(page, date, id).locator('[data-entry]:not([aria-hidden] *)');
+// an entry that is gliding out is hidden from the role tree, so it is only counted while it is visible
+const titles = entries;
+const railRecipe = (page: Page, title: string) =>
+	page.getByRole('complementary', { name: 'Recipes' }).getByRole('listitem').filter({ hasText: title });
 
 test.beforeEach(async ({ request }) => {
 	await reset(request);
@@ -24,7 +25,7 @@ test('Scenario: Move to moves an entry on phone', async ({ page, request }, info
 		]
 	});
 	await open(page, '/plan');
-	const entry = slot(page, MONDAY, 'dinner').locator('[data-entry]');
+	const entry = entries(page, MONDAY, 'dinner');
 	await expect(entry).not.toHaveAttribute('draggable', 'true');
 	await slot(page, MONDAY, 'dinner').getByRole('button', { name: 'Options for Lasagne' }).click();
 	await page.getByRole('menuitem', { name: 'Move to…' }).click();
@@ -41,8 +42,8 @@ test('Scenario: Move to moves an entry on phone', async ({ page, request }, info
 	await expect(titles(page, MONDAY, 'dinner')).toHaveCount(0);
 
 	await page.reload();
-	await expect(slot(page, THURSDAY, 'breakfast').locator('[data-entry]')).toContainText(['Porridge', 'Lasagne']);
-	await expect(slot(page, MONDAY, 'dinner').locator('[data-entry]')).toHaveCount(0);
+	await expect(entries(page, THURSDAY, 'breakfast')).toContainText(['Porridge', 'Lasagne']);
+	await expect(entries(page, MONDAY, 'dinner')).toHaveCount(0);
 });
 
 test('Scenario: Move to is the keyboard alternative on desktop', async ({ page, request }, info) => {
@@ -74,7 +75,7 @@ test('Scenario: Move to is the keyboard alternative on desktop', async ({ page, 
 	await expect(titles(page, MONDAY, 'dinner')).toHaveCount(0);
 	await expect(slot(page, FRIDAY, 'snacks').getByRole('button', { name: 'Options for Lasagne' })).toBeFocused();
 	await page.reload();
-	await expect(slot(page, FRIDAY, 'snacks').locator('[data-entry]')).toContainText(['Lasagne']);
+	await expect(entries(page, FRIDAY, 'snacks')).toContainText(['Lasagne']);
 });
 
 test.describe('drag & drop', () => {
@@ -88,12 +89,12 @@ test.describe('drag & drop', () => {
 	test('Scenario: Drag a recipe from the rail onto a slot', async ({ page, request }) => {
 		await seed(request, { recipes: [{ title: 'Pancakes', servings: 4 }, { title: 'Lasagne', servings: 6 }] });
 		await open(page, '/plan');
-		await page.locator('[data-recipe]', { hasText: 'Lasagne' }).dragTo(slot(page, THURSDAY, 'lunch'));
+		await railRecipe(page, 'Lasagne').dragTo(slot(page, THURSDAY, 'lunch'));
 		await expect(titles(page, THURSDAY, 'lunch')).toContainText(['Lasagne']);
 		await expect(slot(page, THURSDAY, 'lunch').getByText('6 servings')).toBeAttached();
 		await expect(page.locator('[data-drop-target]')).toHaveCount(0);
 		await page.reload();
-		await expect(slot(page, THURSDAY, 'lunch').locator('[data-entry]')).toContainText(['Lasagne']);
+		await expect(entries(page, THURSDAY, 'lunch')).toContainText(['Lasagne']);
 		await expect(slot(page, THURSDAY, 'lunch').getByText('6 servings')).toBeAttached();
 	});
 
@@ -103,11 +104,11 @@ test.describe('drag & drop', () => {
 			entries: [{ date: THURSDAY, slot: 'lunch', text: 'Soup' }]
 		});
 		await open(page, '/plan');
-		await page.locator('[data-recipe]', { hasText: 'Lasagne' }).dragTo(titles(page, THURSDAY, 'lunch').first());
+		await railRecipe(page, 'Lasagne').dragTo(titles(page, THURSDAY, 'lunch').first());
 		await expect(titles(page, THURSDAY, 'lunch')).toHaveCount(2);
 		await expect(titles(page, THURSDAY, 'lunch')).toContainText(['Lasagne', 'Soup']);
 		await page.reload();
-		await expect(slot(page, THURSDAY, 'lunch').locator('[data-entry]')).toContainText(['Lasagne', 'Soup']);
+		await expect(entries(page, THURSDAY, 'lunch')).toContainText(['Lasagne', 'Soup']);
 	});
 
 	test('Scenario: Drag an entry to another day', async ({ page, request }) => {
@@ -120,8 +121,8 @@ test.describe('drag & drop', () => {
 		await expect(titles(page, SATURDAY, 'lunch')).toContainText(['Lasagne']);
 		await expect(titles(page, MONDAY, 'dinner')).toHaveCount(0);
 		await page.reload();
-		await expect(slot(page, SATURDAY, 'lunch').locator('[data-entry]')).toContainText(['Lasagne']);
-		await expect(slot(page, MONDAY, 'dinner').locator('[data-entry]')).toHaveCount(0);
+		await expect(entries(page, SATURDAY, 'lunch')).toContainText(['Lasagne']);
+		await expect(entries(page, MONDAY, 'dinner')).toHaveCount(0);
 	});
 
 	test('Scenario: Reorder entries within a slot', async ({ page, request }) => {
@@ -137,7 +138,7 @@ test.describe('drag & drop', () => {
 		await dinner.nth(1).dragTo(dinner.nth(0));
 		await expect(dinner).toContainText(['Salad', 'Lasagne']);
 		await page.reload();
-		await expect(slot(page, MONDAY, 'dinner').locator('[data-entry]')).toContainText(['Salad', 'Lasagne']);
+		await expect(entries(page, MONDAY, 'dinner')).toContainText(['Salad', 'Lasagne']);
 	});
 
 	test('Scenario: Drop target is highlighted', async ({ page, request }) => {
@@ -164,12 +165,12 @@ test.describe('drag & drop', () => {
 			]
 		});
 		await open(page, '/plan');
-		await titles(page, MONDAY, 'dinner').first().dragTo(page.locator('[data-page-header]'));
+		await titles(page, MONDAY, 'dinner').first().dragTo(page.getByRole('heading', { level: 1 }));
 		await expect(page.locator('[data-drop-target]')).toHaveCount(0);
-		await expect(page.locator('[data-dragging]')).toHaveCount(0);
+		for (const entry of await titles(page, MONDAY, 'dinner').all()) await expect(entry).toHaveCSS('opacity', '1');
 		await expect(titles(page, MONDAY, 'dinner')).toContainText(['Soup', 'Salad']);
 		await page.reload();
-		await expect(page.locator('[data-entry]')).toHaveCount(2);
-		await expect(slot(page, MONDAY, 'dinner').locator('[data-entry]')).toContainText(['Soup', 'Salad']);
+		await expect(allEntries(page)).toHaveCount(2);
+		await expect(entries(page, MONDAY, 'dinner')).toContainText(['Soup', 'Salad']);
 	});
 });

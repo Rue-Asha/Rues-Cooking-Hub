@@ -24,8 +24,8 @@ test('Scenario: Spot page shows hero, panel, rows and actions', async ({ page, r
 	const { spots } = await seed(request, { spots: [full] });
 	await open(page, `/eating-out/${spots[0]}`);
 
-	await expect(page.locator('[data-hero] img')).toBeVisible();
-	const panel = page.locator('[data-spot-info]');
+	await expect(page.getByRole('presentation')).toBeVisible();
+	const panel = page.getByRole('main');
 	await expect(panel.getByRole('heading', { level: 1 })).toContainText('Café Müller');
 	await expect(panel.getByText('8.75', { exact: true })).toBeVisible();
 	await expect(panel.getByText('€€€', { exact: true })).toBeVisible();
@@ -36,7 +36,7 @@ test('Scenario: Spot page shows hero, panel, rows and actions', async ({ page, r
 	await expect(page.getByText('Hauptstraße 5')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Open in Maps' })).toBeVisible();
 	await expect(page.getByText('Website', { exact: true })).toBeVisible();
-	await expect(page.locator('[data-notes] strong')).toHaveText('cinnamon');
+	await expect(page.getByRole('strong')).toHaveText('cinnamon');
 	await expect(page.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', `/eating-out/${spots[0]}/edit`);
 	await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Mark visited' })).toHaveCount(0);
@@ -47,8 +47,8 @@ test('Scenario: Spot page without photo shows the placeholder hero', async ({ pa
 	const { spots } = await seed(request, { spots: [{ name: 'Bare', city: 'Köln' }] });
 	await open(page, `/eating-out/${spots[0]}`);
 
-	await expect(page.locator('[data-hero] img')).toHaveCount(0);
-	await expect(page.locator('[data-hero]').getByRole('img', { name: 'No photo yet' })).toBeVisible();
+	await expect(page.getByRole('presentation')).toHaveCount(0);
+	await expect(page.getByRole('img', { name: 'No photo yet' })).toBeVisible();
 });
 
 test('Scenario: Missing address, website and notes hide their rows', async ({ page, request }) => {
@@ -59,7 +59,7 @@ test('Scenario: Missing address, website and notes hide their rows', async ({ pa
 	await expect(page.getByText('Address', { exact: true })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Open in Maps' })).toHaveCount(0);
 	await expect(page.getByText('Website', { exact: true })).toHaveCount(0);
-	await expect(page.locator('[data-notes]')).toHaveCount(0);
+	await expect(page.getByText('Notes', { exact: true })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Mark visited' })).toBeVisible();
 });
 
@@ -71,7 +71,8 @@ test('Scenario: External links open in a new tab', async ({ page, request }) => 
 	await expect(maps).toHaveAttribute('href', mapsUrl(full)!);
 	await expect(maps).toHaveAttribute('target', '_blank');
 	await expect(maps).toHaveAttribute('rel', /noopener/);
-	const site = page.locator('a[href="https://example.com/mueller"]');
+	const site = page.getByRole('link', { name: 'Visit' });
+	await expect(site).toHaveAttribute('href', 'https://example.com/mueller');
 	await expect(site).toHaveAttribute('target', '_blank');
 	await expect(site).toHaveAttribute('rel', /noopener/);
 });
@@ -99,7 +100,7 @@ test('Spot page screenshot', async ({ page, request }, info) => {
 		]
 	});
 	await open(page, `/eating-out/${spots[0]}`);
-	await expect(page.locator('[data-hero] img')).toBeVisible();
+	await expect(page.getByRole('presentation')).toBeVisible();
 	await page.waitForTimeout(700);
 	await page.screenshot({ path: `test-results/shots/eating-out-spot-${info.project.name}.png`, fullPage: true });
 

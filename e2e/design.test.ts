@@ -1,6 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Unit 4 runs before e2e/helpers.ts exists on its branch, so it opens pages itself.
 const screens = ['home', 'recipes', 'recipe', 'import', 'import-fallback', 'plan', 'list', 'eating-out'];
 
 async function open(page: Page, screen: string) {
@@ -59,47 +58,45 @@ for (const screen of screens) {
 		test(`Scenario: Controls are at least 44px on phone (${screen})`, async ({ page }, info) => {
 			test.skip(info.project.name !== 'phone', 'the 44px rule is for phone');
 			await open(page, screen);
-			const small = await page.evaluate(() =>
-				[...document.querySelectorAll('button, nav a')]
-					.filter((el) => {
-						const r = el.getBoundingClientRect();
-						return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
-					})
-					.map((el) => {
-						const r = el.getBoundingClientRect();
-						return { control: el.outerHTML.slice(0, 120), width: Math.round(r.width), height: Math.round(r.height) };
-					})
-					.filter((c) => c.width < 44 || c.height < 44)
-			);
+			const controls = [...(await page.getByRole('button').all()), ...(await page.getByRole('navigation').getByRole('link').all())];
+			const small: { control: string; width: number; height: number }[] = [];
+			for (const control of controls) {
+				const box = await control.boundingBox();
+				if (!box || box.width === 0 || box.height === 0 || (await control.evaluate((el) => getComputedStyle(el).visibility)) === 'hidden') continue;
+				if (box.width < 44 || box.height < 44) {
+					small.push({ control: (await control.evaluate((el) => el.outerHTML)).slice(0, 120), width: Math.round(box.width), height: Math.round(box.height) });
+				}
+			}
 
 			expect(small).toEqual([]);
 		});
 
 		test(`Scenario: Main screens share one alignment rule (${screen})`, async ({ page }) => {
 			await open(page, screen);
-			const m = await page.evaluate(() => {
-				const left = (el: Element) => el.getBoundingClientRect().left;
-				const visible = (el: Element) => el.getBoundingClientRect().width > 0;
-				const columns = [...document.querySelectorAll('[data-column]')].filter(visible).map((el) => el.getBoundingClientRect());
-				return {
-					viewport: document.documentElement.clientWidth,
-					columns: columns.map((c) => ({ left: c.left, right: c.right })),
-					header: [...document.querySelectorAll('[data-page-header]')].filter(visible).map(left),
-					sections: [...document.querySelectorAll('[data-section-heading]')].filter(visible).map(left)
-				};
-			});
+			const viewport = await page.evaluate(() => document.documentElement.clientWidth);
+			const boxes = async (selector: string) => {
+				const found: { x: number; width: number }[] = [];
+				for (const el of await page.locator(selector).all()) {
+					const box = await el.boundingBox();
+					if (box && box.width > 0) found.push(box);
+				}
+				return found;
+			};
+			const columns = await boxes('[data-column]');
+			const header = await boxes('[data-page-header]');
+			const sections = await boxes('[data-section-heading]');
 
-			expect(m.columns.length).toBeGreaterThan(0);
-			expect(m.header).toHaveLength(1);
-			expect(m.sections.length).toBeGreaterThan(0);
-			const [column] = m.columns;
-			for (const c of m.columns) {
-				expect(Math.abs(c.left - column.left)).toBeLessThanOrEqual(1);
-				expect(Math.abs(c.right - column.right)).toBeLessThanOrEqual(1);
+			expect(columns.length).toBeGreaterThan(0);
+			expect(header).toHaveLength(1);
+			expect(sections.length).toBeGreaterThan(0);
+			const [column] = columns;
+			for (const c of columns) {
+				expect(Math.abs(c.x - column.x)).toBeLessThanOrEqual(1);
+				expect(Math.abs(c.x + c.width - (column.x + column.width))).toBeLessThanOrEqual(1);
 			}
-			expect(Math.abs((column.left + column.right) / 2 - m.viewport / 2)).toBeLessThanOrEqual(1);
-			expect(column.right - column.left).toBeLessThanOrEqual(1200);
-			for (const x of [...m.header, ...m.sections]) expect(Math.abs(x - column.left)).toBeLessThanOrEqual(1);
+			expect(Math.abs(column.x + column.width / 2 - viewport / 2)).toBeLessThanOrEqual(1);
+			expect(column.width).toBeLessThanOrEqual(1200);
+			for (const h of [...header, ...sections]) expect(Math.abs(h.x - column.x)).toBeLessThanOrEqual(1);
 		});
 	});
 }

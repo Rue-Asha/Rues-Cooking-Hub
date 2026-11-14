@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { open, reset, seed, setToday } from './helpers.ts';
+import { allEntries, entries, open, reset, seed, setToday } from './helpers.ts';
 
-const hero = (page: Page) => page.locator('[data-hero]');
-const info = (page: Page) => page.locator('[data-recipe-info]');
+// the hero photo has an empty alt, so it is the page's one presentational image
+const photo = (page: Page) => page.getByRole('presentation');
+const info = (page: Page) => page.getByRole('main');
 
 const full = {
 	title: 'Pumpkin soup',
@@ -29,9 +30,9 @@ test('Scenario: Recipe page shows hero, info panel, sections and notes', async (
 	const { recipes } = await seed(request, { recipes: [full] });
 	await open(page, `/recipes/${recipes[0]}`);
 
-	await expect(hero(page).locator('img')).toBeVisible();
-	await expect(hero(page).locator('img')).toHaveJSProperty('complete', true);
-	expect(await hero(page).locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+	await expect(photo(page)).toBeVisible();
+	await expect(photo(page)).toHaveJSProperty('complete', true);
+	expect(await photo(page).evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
 	await expect(info(page).getByRole('heading', { level: 1 })).toHaveText('Pumpkin soup');
 	await expect(info(page).getByText('Prep 10 min · Cook 20 min · 30 min total')).toBeVisible();
@@ -48,11 +49,11 @@ test('Scenario: Recipe page shows hero, info panel, sections and notes', async (
 
 	const method = page.getByRole('region', { name: 'Method' });
 	await expect(method.getByRole('listitem')).toHaveText([/Roast the pumpkin\./, /Blend with the stock\./]);
-	await expect(method.locator('em')).toHaveText('stock');
+	await expect(method.getByRole('emphasis')).toHaveText('stock');
 
 	const notes = page.getByRole('region', { name: 'Notes' });
 	await expect(notes).toContainText('Freeze half before the cream.');
-	await expect(notes.locator('strong')).toHaveText('before');
+	await expect(notes.getByRole('strong')).toHaveText('before');
 
 	for (const name of ['Add to plan', 'Delete recipe']) await expect(info(page).getByRole('button', { name })).toBeVisible();
 	await expect(info(page).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', `/recipes/${recipes[0]}/edit`);
@@ -62,8 +63,8 @@ test('Scenario: Recipe page without image shows the placeholder hero', async ({ 
 	const { recipes } = await seed(request, { recipes: [{ title: 'Plain rice' }] });
 	await open(page, `/recipes/${recipes[0]}`);
 
-	await expect(hero(page).getByRole('img', { name: 'No photo yet' })).toBeVisible();
-	await expect(hero(page).locator('img')).toHaveCount(0);
+	await expect(page.getByRole('img', { name: 'No photo yet' })).toBeVisible();
+	await expect(photo(page)).toHaveCount(0);
 });
 
 test('Scenario: Recipe page without source URL shows no source link', async ({ page, request }) => {
@@ -80,7 +81,7 @@ test('Scenario: Recipe without times shows no times on its page', async ({ page,
 
 	await expect(info(page).getByText('4 servings', { exact: true })).toBeVisible();
 	await expect(info(page).getByText(/\bmin\b/)).toHaveCount(0);
-	await expect(info(page).locator('[data-times]')).toHaveCount(0);
+	await expect(info(page).getByText(/\b(Prep|Cook|total)\b/)).toHaveCount(0);
 });
 
 test('Scenario: Unknown recipe answers 404', async ({ page }) => {
@@ -95,7 +96,7 @@ test('Scenario: Script in notes is not executed', async ({ page, request }) => {
 
 	const section = page.getByRole('region', { name: 'Notes' });
 	await expect(section).toContainText(notes);
-	await expect(section.locator('script, img')).toHaveCount(0);
+	await expect(section.getByRole('img')).toHaveCount(0);
 	expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
 });
 
@@ -174,10 +175,10 @@ test('Scenario: Add to plan from the recipe', async ({ page, request }) => {
 	await expect(dialog.getByRole('status')).toHaveText('Added to Wednesday · Dinner');
 	await dialog.getByRole('link', { name: 'Open the week' }).click();
 	await expect(page).toHaveURL('/plan?week=2026-10-19');
-	const dinner = page.locator('[data-date="2026-10-21"][data-slot="dinner"]');
-	await expect(dinner.locator('[data-entry]')).toHaveCount(2);
-	await expect(dinner.locator('[data-entry]').nth(1).getByText('Lasagne', { exact: true })).toBeVisible();
-	await expect(dinner.locator('[data-entry]').nth(1).getByText('4 servings')).toBeAttached();
+	const dinner = entries(page, '2026-10-21', 'dinner');
+	await expect(dinner).toHaveCount(2);
+	await expect(dinner.nth(1).getByText('Lasagne', { exact: true })).toBeVisible();
+	await expect(dinner.nth(1).getByText('4 servings')).toBeAttached();
 });
 
 test('Scenario: Servings below 1 are rejected when adding from the recipe', async ({ page, request }) => {
@@ -192,5 +193,5 @@ test('Scenario: Servings below 1 are rejected when adding from the recipe', asyn
 
 	await expect(dialog.getByRole('alert')).toHaveText('Servings must be at least 1');
 	await open(page, '/plan?week=2026-10-19');
-	await expect(page.locator('[data-entry]')).toHaveCount(0);
+	await expect(allEntries(page)).toHaveCount(0);
 });

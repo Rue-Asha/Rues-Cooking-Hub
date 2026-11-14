@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { open, reset, seed } from './helpers.ts';
 
 const cards = (page: Page) => page.getByRole('article');
-const ranks = (page: Page) => page.locator('.card .rank');
+const ranks = (page: Page) => page.getByText(/^#\d+$/);
 
 test('Scenario: Ranks show while sorted by score', async ({ page, request }) => {
 	await reset(request);

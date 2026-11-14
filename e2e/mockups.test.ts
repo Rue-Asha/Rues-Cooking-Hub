@@ -14,7 +14,15 @@ for (const screen of screens) {
 			await Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined)));
 		});
 		// a full-page shot would leave the fixed phone tab bar half-way down the image; pin it to the page's end
-		await page.addStyleTag({ content: 'body { position: relative } [data-shot-bottom] { position: absolute !important }' });
+		await page.addStyleTag({ content: 'body { position: relative }' });
+		await page
+			.getByRole('navigation', { name: 'Main' })
+			.last()
+			.evaluate((nav) => {
+				for (let el: Element | null = nav; el instanceof HTMLElement; el = el.parentElement) {
+					if (getComputedStyle(el).position === 'fixed') return void el.style.setProperty('position', 'absolute', 'important');
+				}
+			});
 
 		const path = `test-results/shots/mockups/${info.project.name}-${screen}.png`;
 		await page.screenshot({ path, fullPage: true, animations: 'disabled' });

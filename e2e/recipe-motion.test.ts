@@ -1,11 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import { calm, open, reset, seed } from './helpers.ts';
+import { calm, carriedName, open, reset, seed } from './helpers.ts';
 
 type Call = { named: number; inCard: number };
 type Recorded = { calls: Call[]; hero: string };
 
-const media = (page: Page) => page.locator('[data-hero] .media');
-const transform = (page: Page) => media(page).evaluate((el) => getComputedStyle(el).transform);
+// the hero photo has an empty alt, so it is the page's one presentational image
+const photo = (page: Page) => page.getByRole('presentation');
+const transform = (page: Page) => photo(page).evaluate((el) => getComputedStyle(el).transform);
+const photoName = (page: Page) => carriedName(photo(page));
 
 const long = {
 	title: 'Pumpkin soup',
@@ -23,7 +25,7 @@ async function recordTransitions(page: Page, name: string) {
 		if (!start) return;
 		document.startViewTransition = ((...args: Parameters<typeof start>) => {
 			const named = [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).viewTransitionName === w.hero);
-			w.calls.push({ named: named.length, inCard: named.filter((el) => el.closest('.card')).length });
+			w.calls.push({ named: named.length, inCard: named.filter((el) => el.closest('article')).length });
 			return start(...args);
 		}) as typeof document.startViewTransition;
 	}, name);
@@ -69,8 +71,11 @@ test('Scenario: Card and recipe page share the hero image', async ({ page, reque
 	await page.getByRole('list', { name: 'Recipes' }).getByRole('link', { name: 'Pumpkin soup' }).click();
 	await expect(page).toHaveURL(`/recipes/${recipes[1]}`);
 
+	// the card photos leave the DOM with the list, which leaves the page's one presentational image
+	await expect(page.getByRole('list', { name: 'Recipes' })).toHaveCount(0);
+	await expect(page.getByRole('heading', { level: 1, name: 'Pumpkin soup' })).toBeVisible();
 	expect(await calls(page)).toEqual([{ named: 1, inCard: 1 }]);
-	await expect.poll(() => page.locator('[data-hero]').evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe(name);
+	await expect.poll(() => photoName(page)).toBe(name);
 	expect(await named(page, name)).toBe(1);
 
 	await page.goBack();
@@ -93,9 +98,9 @@ test('Scenario: Reduced motion skips the shared element', async ({ page, request
 
 	await page.getByRole('list', { name: 'Recipes' }).getByRole('link', { name: 'Pumpkin soup' }).click();
 	await expect(page).toHaveURL(`/recipes/${recipes[0]}`);
-	await expect(page.locator('[data-hero]')).toBeVisible();
+	await expect(photo(page)).toBeVisible();
 
 	expect(await calls(page)).toEqual([]);
 	expect(await named(page, name)).toBe(0);
-	expect(await page.locator('[data-hero]').evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe('none');
+	expect(await photoName(page)).toBe('none');
 });

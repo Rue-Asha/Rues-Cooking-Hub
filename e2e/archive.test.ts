@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { open, reset, seed } from './helpers.ts';
 
 const grid = (page: Page) => page.getByRole('list', { name: 'Recipes' });
@@ -24,7 +24,7 @@ test('Scenario: Cards show image, title, description, time and tags', async ({ p
 	await open(page, '/recipes');
 
 	const c = card(page, 'Lemon tart');
-	const img = c.locator('img');
+	const img = c.getByRole('presentation');
 	await expect(img).toHaveAttribute('src', /^\/images\/\d+$/);
 	await expect(img).toBeVisible();
 	expect(await img.evaluate(async (el: HTMLImageElement) => (await el.decode(), el.naturalWidth))).toBeGreaterThan(0);
@@ -55,7 +55,7 @@ test('Scenario: Card without description shows title and meta', async ({ page, r
 	await expect(c.getByRole('link', { name: 'Plain rice', exact: true })).toBeVisible();
 	await expect(c.getByText('15 min', { exact: true })).toBeVisible();
 	await expect(c.getByText('Side', { exact: true })).toBeVisible();
-	await expect(c.locator('p')).toHaveCount(0);
+	await expect(c.getByRole('paragraph')).toHaveCount(0);
 });
 
 test('Scenario: Long titles and descriptions are clamped', async ({ page, request }) => {
@@ -66,14 +66,14 @@ test('Scenario: Long titles and descriptions are clamped', async ({ page, reques
 	await open(page, '/recipes');
 
 	const c = card(page, title);
-	const box = (selector: string) =>
-		c.locator(selector).evaluate((el) => ({
+	const box = (part: Locator) =>
+		part.evaluate((el) => ({
 			height: el.getBoundingClientRect().height,
 			line: parseFloat(getComputedStyle(el).lineHeight),
 			clipped: el.scrollHeight > el.clientHeight
 		}));
-	const heading = await box('h3');
-	const desc = await box('p');
+	const heading = await box(c.getByRole('heading'));
+	const desc = await box(c.getByRole('paragraph'));
 
 	expect(heading.height).toBeLessThanOrEqual(2 * heading.line + 1);
 	expect(heading.clipped).toBe(true);
@@ -88,7 +88,7 @@ test('Scenario: Card without image shows the placeholder', async ({ page, reques
 
 	const c = card(page, 'Pea soup');
 	await expect(c.getByRole('img', { name: 'No photo yet' })).toBeVisible();
-	await expect(c.locator('img')).toHaveCount(0);
+	await expect(c.getByRole('presentation')).toHaveCount(0);
 });
 
 test('Scenario: Recipe without times shows no time on its card', async ({ page, request }) => {

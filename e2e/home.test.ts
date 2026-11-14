@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { calm, open, reset, seed, setToday } from './helpers.ts';
+import { calm, homeTiles, open, reset, seed, setToday } from './helpers.ts';
 
 const MONDAY = '2026-10-19';
 const WEDNESDAY = '2026-10-21';
@@ -10,7 +10,11 @@ test.beforeEach(async ({ request }) => {
 	await setToday(request, WEDNESDAY);
 });
 
-const tile = (page: Page, name: 'hero' | 'week' | 'list' | 'favourite') => page.locator(`[data-tile="${name}"]`);
+const today = (page: Page) => page.getByRole('region', { name: 'Today' });
+const tile = (page: Page, name: 'hero' | 'week' | 'list' | 'favourite') =>
+	name === 'hero'
+		? today(page).getByRole('article')
+		: today(page).getByRole('link', { name: { week: /^This week/, list: /^Shopping list/, favourite: /^Favourite/ }[name] });
 
 test("Scenario: Hero shows today's planned recipe", async ({ page, request }) => {
 	const { recipes } = await seed(request, {
@@ -24,7 +28,7 @@ test("Scenario: Hero shows today's planned recipe", async ({ page, request }) =>
 
 	const hero = tile(page, 'hero');
 	await expect(hero.getByRole('heading', { level: 2 })).toHaveText('Lasagne');
-	await expect(hero.locator('img')).toHaveAttribute('src', /^\/images\/\d+$/);
+	await expect(hero.getByRole('presentation')).toHaveAttribute('src', /^\/images\/\d+$/);
 	await expect(hero.getByText('Tonight · Dinner')).toBeVisible();
 	await expect(hero.getByRole('link', { name: 'Lasagne' })).toHaveAttribute('href', `/recipes/${recipes[0]}`);
 
@@ -61,7 +65,7 @@ test('Scenario: Empty archive shows the welcome hero', async ({ page }) => {
 	const hero = tile(page, 'hero');
 	await expect(hero.getByRole('heading', { level: 2 })).toBeVisible();
 	await expect(hero.getByRole('link', { name: 'Add your first recipe' })).toHaveAttribute('href', '/recipes/new');
-	await expect(hero.locator('img')).toHaveCount(0);
+	await expect(hero.getByRole('presentation')).toHaveCount(0);
 	await expect(page.getByRole('heading', { name: 'Recently added' })).toHaveCount(0);
 });
 
@@ -79,14 +83,15 @@ test('Scenario: This week tile lists the seven days', async ({ page, request }) 
 	const week = tile(page, 'week');
 	await expect(week).toHaveAttribute('href', '/plan');
 	await expect(week.getByRole('heading', { level: 2 })).toHaveText('This week');
-	const days = week.locator('[data-day]');
+	const days = week.getByRole('listitem');
 	await expect(days).toHaveCount(7);
-	await expect(days.locator('[data-weekday]')).toHaveText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-	await expect(week.locator(`[data-day="${MONDAY}"] [data-entry]`)).toHaveText('Pumpkin soup');
-	await expect(week.locator(`[data-day="${MONDAY}"] img`)).toHaveAttribute('src', /^\/images\/\d+$/);
-	await expect(week.locator(`[data-day="${THURSDAY}"] [data-entry]`)).toHaveText('Leftover curry');
-	await expect(week.locator('[data-entry]')).toHaveCount(2);
-	await expect(week.locator(`[data-day="${WEDNESDAY}"]`)).toHaveAttribute('data-today', '');
+	await expect(days).toContainText(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+	const monday = days.filter({ hasText: 'Mon' });
+	await expect(monday.getByText('Pumpkin soup', { exact: true })).toBeVisible();
+	await expect(monday.getByRole('presentation')).toHaveAttribute('src', /^\/images\/\d+$/);
+	await expect(days.filter({ hasText: 'Thu' }).getByText('Leftover curry', { exact: true })).toBeVisible();
+	await expect(days.filter({ hasText: 'Nothing planned' })).toHaveCount(5);
+	await expect(days.filter({ hasText: 'Wed' })).toHaveAttribute('aria-current', 'date');
 	await expect(week).not.toContainText('Next week');
 
 	await week.click();
@@ -108,8 +113,8 @@ test('Scenario: Shopping tile shows open count and first items', async ({ page, 
 
 	const list = tile(page, 'list');
 	await expect(list).toHaveAttribute('href', '/list');
-	await expect(list.locator('[data-open]')).toHaveText('5 open');
-	await expect(list.locator('li')).toHaveText(['apples', 'bananas', 'milk']);
+	await expect(list.getByText('5 open')).toBeVisible();
+	await expect(list.getByRole('listitem', { includeHidden: true })).toHaveText(['apples', 'bananas', 'milk']);
 	await expect(list).not.toContainText('carrots');
 
 	await list.click();
@@ -122,7 +127,7 @@ test('Scenario: Empty list tile says List is empty', async ({ page, request }) =
 
 	const list = tile(page, 'list');
 	await expect(list.getByText('List is empty', { exact: true })).toBeVisible();
-	await expect(list.locator('li')).toHaveCount(0);
+	await expect(list.getByRole('listitem')).toHaveCount(0);
 	await expect(list).toHaveAttribute('href', '/list');
 });
 
@@ -136,7 +141,7 @@ test('Scenario: Favourite tile shows the most recently favourited recipe', async
 	await open(page, '/');
 
 	const fav = tile(page, 'favourite');
-	await expect(fav.locator('[data-title]')).toHaveText('Lemon tart');
+	await expect(fav.getByText('Lemon tart', { exact: true })).toBeVisible();
 	await expect(fav).not.toContainText('Tomato soup');
 	await expect(fav).toHaveAttribute('href', `/recipes/${recipes[0]}`);
 
@@ -173,12 +178,12 @@ test('Home carries each recipe hero name once, on the hero photo first', async (
 test('Home tiles rise in one after another', async ({ page, request }) => {
 	await seed(request, { recipes: [{ title: 'Lasagne', image: true }] });
 	await open(page, '/');
-	await expect(page.locator('[data-tile]')).toHaveCount(4);
+	await expect(homeTiles(page)).toHaveCount(4);
 
-	const delays = await page.locator('[data-tile]').evaluateAll((els) =>
+	const delays = await homeTiles(page).evaluateAll((els) =>
 		els.map((el) => parseFloat(getComputedStyle(el).animationDelay) * 1000)
 	);
-	const names = await page.locator('[data-tile]').evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName));
+	const names = await homeTiles(page).evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName));
 	expect(names.every((n) => n !== 'none')).toBe(true);
 	for (let i = 1; i < delays.length; i++) expect(delays[i]).toBeGreaterThan(delays[i - 1]);
 });
@@ -189,7 +194,7 @@ test('Home hero photo drifts on scroll', async ({ page, request }) => {
 		entries: [{ date: WEDNESDAY, slot: 'dinner', recipe: 0, servings: 2 }]
 	});
 	await open(page, '/');
-	const photo = tile(page, 'hero').locator('img');
+	const photo = tile(page, 'hero').getByRole('presentation');
 	const transform = () => photo.evaluate((el) => getComputedStyle(el).transform);
 	const before = await transform();
 
@@ -206,10 +211,10 @@ test('Reduced motion keeps Home still', async ({ page, request }) => {
 	await calm(page);
 	await open(page, '/');
 
-	const names = await page.locator('[data-tile]').evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName));
+	const names = await homeTiles(page).evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName));
 	expect(names.every((n) => n === 'none')).toBe(true);
 	await page.evaluate(() => window.scrollTo(0, 400));
 	await page.evaluate(() => new Promise(requestAnimationFrame));
-	expect(await tile(page, 'hero').locator('img').evaluate((el) => getComputedStyle(el).transform)).toBe('none');
+	expect(await tile(page, 'hero').getByRole('presentation').evaluate((el) => getComputedStyle(el).transform)).toBe('none');
 	expect(await named(page, `recipe-hero-${recipes[0]}`)).toBe(0);
 });

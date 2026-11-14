@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { startFixtureServer, type FixtureServer } from './fixture-server.ts';
-import { open, reset, seed, setToday } from './helpers.ts';
+import { open, reset, seed, setToday, slot } from './helpers.ts';
 
 let fixtures: FixtureServer;
 
@@ -19,7 +19,7 @@ test.afterEach(async ({ request }) => {
 const nav = (page: Page, label: string) =>
 	page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: label, exact: true }).click();
 const grid = (page: Page) => page.getByRole('list', { name: 'Recipes' });
-const info = (page: Page) => page.locator('[data-recipe-info]');
+const info = (page: Page) => page.getByRole('main');
 const category = (page: Page, name: string) =>
 	page.getByRole('region', { name: 'To buy' }).getByRole('list', { name, exact: true });
 const item = (page: Page, list: string, name: string) =>
@@ -105,11 +105,12 @@ test('Scenario: Imported recipe reaches the list scaled and grouped', async ({ p
 	// Home shows it today
 	await nav(page, 'Home');
 	await expect(page).toHaveURL('/');
-	await expect(page.locator('[data-tile="week"] [data-day="2026-10-21"] [data-entry]')).toHaveText('Lemon curd tart');
+	const week = page.getByRole('region', { name: 'Today' }).getByRole('link', { name: /^This week/ });
+	await expect(week.getByRole('listitem').filter({ hasText: 'Wed' })).toContainText('Lemon curd tart');
 
 	// the plan has it with four servings
 	await nav(page, 'Plan');
-	const dinner = page.locator('[data-date="2026-10-21"][data-slot="dinner"]');
+	const dinner = slot(page, '2026-10-21', 'dinner');
 	await expect(dinner.getByText('Lemon curd tart', { exact: true })).toBeVisible();
 	await expect(dinner.getByText('4 servings')).toBeAttached();
 

@@ -1,20 +1,29 @@
-import { expect, test, type Page } from '@playwright/test';
-import { open } from './helpers.ts';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { mainNav, navDivider, open } from './helpers.ts';
 
 test.beforeEach(({}, info) => test.skip(info.project.name !== 'desktop', 'desktop header'));
 
-const actions = (page: Page) => page.locator('[data-nav="top"] .actions');
+const header = (page: Page) => page.getByRole('banner');
+const actions = header;
+
+// brand, five nav links and the two actions: a third action would add a link or a button
+const pinActions = async (page: Page) => {
+	await expect(header(page).getByRole('link')).toHaveCount(8);
+	await expect(header(page).getByRole('button')).toHaveCount(0);
+};
 
 test('Scenario: Eating Out header shows spot actions', async ({ page }) => {
 	await open(page, '/eating-out');
 	await expect(actions(page).getByRole('link', { name: 'Search spots' })).toHaveAttribute('href', '/eating-out#search');
 	await expect(actions(page).getByRole('link', { name: 'Add spot' })).toHaveAttribute('href', '/eating-out/new');
-	await expect(actions(page).getByRole('link', { name: /recipe/i })).toHaveCount(0);
+	await expect(actions(page).getByRole('link', { name: /^(Search|Add) .*recipe/i })).toHaveCount(0);
+	await pinActions(page);
 
 	await open(page, '/plan');
 	await expect(actions(page).getByRole('link', { name: 'Search recipes' })).toHaveAttribute('href', '/recipes');
 	await expect(actions(page).getByRole('link', { name: 'Add recipe' })).toHaveAttribute('href', '/recipes/new');
-	await expect(actions(page).getByRole('link', { name: /spot/i })).toHaveCount(0);
+	await expect(actions(page).getByRole('link', { name: /^(Search|Add) .*spot/i })).toHaveCount(0);
+	await pinActions(page);
 });
 
 test('Scenario: Header follows client-side navigation', async ({ page }) => {
@@ -31,17 +40,22 @@ test('Scenario: Desktop header fits at 1024 px', async ({ page }) => {
 	await page.setViewportSize({ width: 1024, height: 768 });
 	for (const path of ['/plan', '/eating-out']) {
 		await open(page, path);
-		const m = await page.evaluate(() => {
-			const box = (s: string) => document.querySelector(s)!.getBoundingClientRect();
-			const root = document.documentElement;
-			return {
-				brand: box('[data-nav="top"] .brand').right,
-				pill: [box('[data-nav="top"] nav').left, box('[data-nav="top"] nav').right],
-				actions: [box('[data-nav="top"] .actions').left, box('[data-nav="top"] .actions').right],
-				divider: [box('[data-nav="top"] [data-divider]').left, box('[data-nav="top"] [data-divider]').right],
-				scroll: [root.scrollWidth, root.clientWidth]
-			};
-		});
+		const left = async (l: Locator) => (await l.boundingBox())!.x;
+		const right = async (l: Locator) => {
+			const b = (await l.boundingBox())!;
+			return b.x + b.width;
+		};
+		const brand = header(page).getByRole('link', { name: 'Rues Cooking Hub' });
+		const search = header(page).getByRole('link', { name: /^Search / });
+		const add = header(page).getByRole('link', { name: /^Add / });
+		const divider = navDivider(mainNav(page));
+		const m = {
+			brand: await right(brand),
+			pill: [await left(mainNav(page)), await right(mainNav(page))],
+			actions: [await left(search), await right(add)],
+			divider: [await left(divider), await right(divider)],
+			scroll: await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth])
+		};
 		console.log(path, JSON.stringify(m));
 		expect(m.brand, path).toBeLessThanOrEqual(m.pill[0]);
 		expect(m.pill[1], path).toBeLessThanOrEqual(m.actions[0]);

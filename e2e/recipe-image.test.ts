@@ -36,8 +36,8 @@ test.beforeEach(async ({ request }) => {
 test('Scenario: Image upload from the form', async ({ page, request }) => {
 	await newForm(page);
 
-	await page.locator('input[type=file]').setInputFiles(await jpeg());
-	await expect(page.locator('[data-image-frame] img')).toBeVisible();
+	await page.getByLabel('Photo file').setInputFiles(await jpeg());
+	await expect(page.getByRole('presentation')).toBeVisible();
 	await save(page);
 
 	await expect(page).toHaveURL(/\/recipes\/\d+$/);
@@ -48,14 +48,14 @@ test('Scenario: Image upload from the form', async ({ page, request }) => {
 	expect(image.headers()['content-type']).toBe('image/webp');
 
 	await open(page, `/recipes/${recipe.id}/edit`);
-	await expect(page.locator('[data-image-frame] img:not([role])')).toHaveAttribute('src', `/images/${recipe.image_id}`);
+	await expect(page.getByRole('presentation')).toHaveAttribute('src', `/images/${recipe.image_id}`);
 });
 
 test('Scenario: Non-image file is rejected in the form', async ({ page }) => {
 	await newForm(page);
 
 	await page
-		.locator('input[type=file]')
+		.getByLabel('Photo file')
 		.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a picture') });
 	await save(page);
 
@@ -70,7 +70,7 @@ test('Scenario: Oversize file is rejected in the form', async ({ page }) => {
 	const posts: string[] = [];
 	page.on('request', (r) => r.method() === 'POST' && posts.push(r.url()));
 
-	await page.locator('input[type=file]').setInputFiles({
+	await page.getByLabel('Photo file').setInputFiles({
 		name: 'huge.jpg',
 		mimeType: 'image/jpeg',
 		buffer: Buffer.alloc(16 * 1024 * 1024)
@@ -140,15 +140,14 @@ test('an image link that works is downloaded and stored', async ({ page, request
 
 test('Remove image drops a chosen file and shows the placeholder again', async ({ page }) => {
 	await newForm(page);
-	const frame = page.locator('[data-image-frame]');
 
-	await expect(frame.getByRole('img', { name: 'No photo yet' })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'No photo yet' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Remove image' })).toHaveCount(0);
-	await page.locator('input[type=file]').setInputFiles(await jpeg());
-	await expect(frame.locator('img:not([role])')).toBeVisible();
+	await page.getByLabel('Photo file').setInputFiles(await jpeg());
+	await expect(page.getByRole('presentation')).toBeVisible();
 	await page.getByRole('button', { name: 'Remove image' }).click();
 
-	await expect(frame.getByRole('img', { name: 'No photo yet' })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'No photo yet' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Remove image' })).toHaveCount(0);
 	await save(page);
 
@@ -169,13 +168,13 @@ test('swapping the image animates, and not under reduced motion', async ({ page 
 	await newForm(page);
 	await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a instanceof CSSTransition));
 
-	await page.locator('input[type=file]').setInputFiles(await jpeg());
+	await page.getByLabel('Photo file').setInputFiles(await jpeg());
 	expect(await running(page)).toBeGreaterThan(0);
 
 	await calm(page);
 	await page.getByRole('button', { name: 'Remove image' }).click();
-	await page.locator('input[type=file]').setInputFiles(await jpeg('again.jpg'));
-	await expect(page.locator('[data-image-frame] img:not([role])')).toBeVisible();
+	await page.getByLabel('Photo file').setInputFiles(await jpeg('again.jpg'));
+	await expect(page.getByRole('presentation')).toBeVisible();
 	expect(await running(page)).toBe(0);
 });
 
@@ -184,17 +183,16 @@ test('Scenario: Remove image shows the placeholder', async ({ page, request }) =
 	const id = seeded[0];
 	const old = rows<{ image_id: number }>(`SELECT image_id FROM recipes WHERE id = ${id}`)[0].image_id;
 	await open(page, `/recipes/${id}/edit`);
-	const frame = page.locator('[data-image-frame]');
-	await expect(frame.locator('img:not([role])')).toBeVisible();
+	await expect(page.getByRole('presentation')).toBeVisible();
 
 	await page.getByRole('button', { name: 'Remove image' }).click();
-	await expect(frame.getByRole('img', { name: 'No photo yet' })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'No photo yet' })).toBeVisible();
 	await save(page);
 
 	await expect(page).toHaveURL(new RegExp(`/recipes/${id}$`));
 	await open(page, `/recipes/${id}/edit`);
-	await expect(frame.getByRole('img', { name: 'No photo yet' })).toBeVisible();
-	await expect(frame.locator('img:not([role])')).toHaveCount(0);
+	await expect(page.getByRole('img', { name: 'No photo yet' })).toBeVisible();
+	await expect(page.getByRole('presentation')).toHaveCount(0);
 	expect((await request.get(`/images/${old}`)).status()).toBe(404);
 	expect(imageCount()).toBe(0);
 });
@@ -205,7 +203,7 @@ test('replacing the image of a recipe removes the old one', async ({ page, reque
 	const old = rows<{ image_id: number }>(`SELECT image_id FROM recipes WHERE id = ${id}`)[0].image_id;
 	await open(page, `/recipes/${id}/edit`);
 
-	await page.locator('input[type=file]').setInputFiles(await jpeg());
+	await page.getByLabel('Photo file').setInputFiles(await jpeg());
 	await save(page);
 
 	await expect(page).toHaveURL(new RegExp(`/recipes/${id}$`));

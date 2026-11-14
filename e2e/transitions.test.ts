@@ -57,11 +57,11 @@ test('Scenario: Reduced motion skips the page transition', async ({ page }) => {
 test('Navigation inside one area skips the page transition', async ({ page }) => {
 	await countTransitions(page);
 	await open(page, '/recipes');
-	await page.evaluate(() => {
+	await page.getByRole('main').evaluate((main) => {
 		const link = document.createElement('a');
 		link.href = '/recipes?sort=title';
 		link.textContent = 'Sort by title';
-		document.querySelector('main')!.append(link);
+		main.append(link);
 	});
 	await page.getByRole('link', { name: 'Sort by title' }).click();
 	await expect(page).toHaveURL('/recipes?sort=title');

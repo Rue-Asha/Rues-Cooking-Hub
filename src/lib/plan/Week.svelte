@@ -52,6 +52,7 @@
 			data-day={date}
 			data-today={date === today ? '' : undefined}
 			aria-labelledby="day-{date}"
+			aria-current={date === today ? 'date' : undefined}
 			style:grid-column={i + 1}
 		>
 			<div class="day-head">
@@ -62,7 +63,7 @@
 				<span class="num tnum">{Number(date.slice(8))}<span class="month">{label(date, { month: 'short' })}</span></span>
 				{#if date === today}<span class="today-chip">Today</span>{/if}
 			</div>
-			<div class="slots">
+			<div class="slots" role="group" aria-label="{long} meals">
 				{#each SLOTS as slot, s (slot.id)}
 					<SlotView {date} dayName={long} {slot} index={s} entries={inSlot(date, slot.id)} {onadd} />
 				{/each}

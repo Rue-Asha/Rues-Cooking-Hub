@@ -1,7 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-import { open, reset, seed, setToday } from './helpers.ts';
-
-const slot = (page: Page, date: string, id: string) => page.locator(`[data-date="${date}"][data-slot="${id}"]`);
+import { expect, test } from '@playwright/test';
+import { entries, open, reset, seed, setToday, slot } from './helpers.ts';
 
 test.beforeEach(async ({ request }) => {
 	await reset(request);
@@ -28,7 +26,7 @@ test('Scenario: Add a recipe entry with the picker', async ({ page, request }) =
 	await picker.getByRole('button', { name: 'Add to plan' }).click();
 	await expect(picker).toBeHidden();
 	const dinner = slot(page, '2026-10-20', 'dinner');
-	await expect(dinner.locator('[data-entry]')).toHaveCount(1);
+	await expect(entries(page, '2026-10-20', 'dinner')).toHaveCount(1);
 	await expect(dinner.getByText('Lasagne', { exact: true })).toBeVisible();
 	await expect(dinner.getByText('4 servings')).toBeAttached();
 	await page.reload();
@@ -44,7 +42,7 @@ test('Scenario: Add a free-text entry', async ({ page }) => {
 	await picker.getByRole('button', { name: 'Add to plan' }).click();
 	await expect(picker).toBeHidden();
 	await expect(slot(page, '2026-10-23', 'dinner').getByText('Pizza night')).toBeVisible();
-	await expect(slot(page, '2026-10-23', 'dinner').locator('[data-entry]')).toHaveCount(1);
+	await expect(entries(page, '2026-10-23', 'dinner')).toHaveCount(1);
 });
 
 test('Scenario: Empty free text shows an error', async ({ page }) => {
@@ -55,7 +53,7 @@ test('Scenario: Empty free text shows an error', async ({ page }) => {
 	await picker.getByRole('button', { name: 'Add to plan' }).click();
 	await expect(picker.getByText('Enter a recipe or some text')).toBeVisible();
 	await expect(picker).toBeVisible();
-	await expect(slot(page, '2026-10-23', 'dinner').locator('[data-entry]')).toHaveCount(0);
+	await expect(entries(page, '2026-10-23', 'dinner')).toHaveCount(0);
 });
 
 test('Scenario: Edit and delete an entry', async ({ page, request }) => {

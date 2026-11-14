@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { open, reset, seed } from './helpers.ts';
+import { homeTiles, open, reset, seed } from './helpers.ts';
 
 const visited = (name: string, scoreHundredths: number, extra: object = {}) => ({ name, status: 'visited' as const, scoreHundredths, ...extra });
 
@@ -17,14 +17,14 @@ test('Scenario: Home shows Top spots after Recently added', async ({ page, reque
 	const [a, b] = await Promise.all([recent.boundingBox(), top.boundingBox()]);
 	expect(b!.y).toBeGreaterThan(a!.y);
 
-	const section = page.locator('section', { has: top });
+	const section = page.getByRole('region', { name: 'Top spots' });
 	const cards = section.getByRole('article');
 	await expect(cards.getByRole('heading')).toHaveText(['First', 'Second', 'Third', 'Fourth']);
-	await expect(cards.locator('.badge')).toHaveText(['9.50', '8.75', '8.50', '8.10']);
-	await expect(cards.locator('.rank')).toHaveCount(0);
+	await expect(cards.getByText(/^\d+\.\d\d$/)).toHaveText(['9.50', '8.75', '8.50', '8.10']);
+	await expect(cards.getByText(/^#\d+$/)).toHaveCount(0);
 	await expect(section.getByRole('link', { name: /All spots/ })).toHaveAttribute('href', '/eating-out');
 	await expect(cards.first().getByRole('link', { name: 'First' })).toHaveAttribute('href', `/eating-out/${spots[1]}`);
-	await expect(page.locator('[data-tile]')).toHaveCount(4);
+	await expect(homeTiles(page)).toHaveCount(4);
 });
 
 test('Scenario: Fewer than four visited spots shows what exists', async ({ page, request }) => {
@@ -32,7 +32,7 @@ test('Scenario: Fewer than four visited spots shows what exists', async ({ page,
 	await seed(request, { spots: [visited('Alpha', 800), visited('Beta', 900), { name: 'Gamma' }] });
 	await open(page, '/');
 
-	const section = page.locator('section', { has: page.getByRole('heading', { name: 'Top spots' }) });
+	const section = page.getByRole('region', { name: 'Top spots' });
 	await expect(section.getByRole('article').getByRole('heading')).toHaveText(['Beta', 'Alpha']);
 });
 
@@ -42,7 +42,7 @@ test('Scenario: No visited spot hides Top spots', async ({ page, request }) => {
 	await open(page, '/');
 
 	await expect(page.getByRole('heading', { name: 'Top spots' })).toHaveCount(0);
-	await expect(page.locator('a[href^="/eating-out/"]')).toHaveCount(0);
+	await expect(page.getByRole('link', { name: /Gamma|Delta/ })).toHaveCount(0);
 });
 
 test('Scenario: Top spots row lays out like Recently added', async ({ page, request }, info) => {
@@ -53,7 +53,7 @@ test('Scenario: Top spots row lays out like Recently added', async ({ page, requ
 	});
 	await open(page, '/');
 
-	const section = page.locator('section', { has: page.getByRole('heading', { name: 'Top spots' }) });
+	const section = page.getByRole('region', { name: 'Top spots' });
 	const boxes = await section.getByRole('article').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [Math.round(r.x), Math.round(r.y)]));
 	const xs = new Set(boxes.map(([x]) => x));
 	const ys = new Set(boxes.map(([, y]) => y));
@@ -62,7 +62,7 @@ test('Scenario: Top spots row lays out like Recently added', async ({ page, requ
 	} else {
 		expect([xs.size, ys.size]).toEqual([4, 1]);
 	}
-	const column = await page.locator('[data-column]').boundingBox();
+	const column = await page.getByRole('heading', { level: 1 }).boundingBox();
 	const heading = await page.getByRole('heading', { name: 'Top spots' }).boundingBox();
 	expect(Math.abs(heading!.x - column!.x)).toBeLessThanOrEqual(1);
 	const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
