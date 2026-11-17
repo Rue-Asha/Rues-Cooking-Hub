@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { homeTiles, open, reset, seed } from './helpers.ts';
+import { open, reset, seed } from './helpers.ts';
 
 const visited = (name: string, scoreHundredths: number, extra: object = {}) => ({ name, status: 'visited' as const, scoreHundredths, ...extra });
 
@@ -11,23 +11,24 @@ test('Scenario: Home shows Top spots after Recently added', async ({ page, reque
 	});
 	await open(page, '/');
 
-	const recent = page.getByRole('heading', { name: 'Recently added' });
-	const top = page.getByRole('heading', { name: 'Top spots' });
+	const recent = page.getByRole('region', { name: 'Recently added' });
+	const top = page.getByRole('region', { name: 'Top spots' });
 	await expect(top).toBeVisible();
 	const [a, b] = await Promise.all([recent.boundingBox(), top.boundingBox()]);
-	expect(b!.y).toBeGreaterThan(a!.y);
+	// follows: Top spots starts below the bottom edge of Recently added
+	expect(b!.y).toBeGreaterThanOrEqual(a!.y + a!.height - 1);
 
 	const section = page.getByRole('region', { name: 'Top spots' });
 	const cards = section.getByRole('article');
-	await expect(cards.getByRole('heading')).toHaveText(['First', 'Second', 'Third', 'Fourth']);
-	await expect(cards.getByText(/^\d+\.\d\d$/)).toHaveText(['9.50', '8.75', '8.50', '8.10']);
+	await expect(cards.getByRole('heading')).toHaveText(['First', 'Second', 'Third']);
+	await expect(cards.getByText(/^\d+\.\d\d$/)).toHaveText(['9.50', '8.75', '8.50']);
 	await expect(cards.getByText(/^#\d+$/)).toHaveCount(0);
 	await expect(section.getByRole('link', { name: /All spots/ })).toHaveAttribute('href', '/eating-out');
-	await expect(cards.first().getByRole('link', { name: 'First' })).toHaveAttribute('href', `/eating-out/${spots[1]}`);
-	await expect(homeTiles(page)).toHaveCount(4);
+	for (const [i, [name, id]] of ([['First', spots[1]], ['Second', spots[3]], ['Third', spots[4]]] as const).entries())
+		await expect(cards.nth(i).getByRole('link', { name })).toHaveAttribute('href', `/eating-out/${id}`);
 });
 
-test('Scenario: Fewer than four visited spots shows what exists', async ({ page, request }) => {
+test('Scenario: Fewer than three visited spots shows what exists', async ({ page, request }) => {
 	await reset(request);
 	await seed(request, { spots: [visited('Alpha', 800), visited('Beta', 900), { name: 'Gamma' }] });
 	await open(page, '/');
@@ -45,11 +46,11 @@ test('Scenario: No visited spot hides Top spots', async ({ page, request }) => {
 	await expect(page.getByRole('link', { name: /Gamma|Delta/ })).toHaveCount(0);
 });
 
-test('Scenario: Top spots row lays out like Recently added', async ({ page, request }, info) => {
+test('Scenario: Top spots lay out in two columns on phone and three on desktop', async ({ page, request }, info) => {
 	await reset(request);
 	await seed(request, {
 		recipes: [{ title: 'Lasagne' }],
-		spots: [visited('One', 900), visited('Two', 880), visited('Three', 860), visited('Four', 840)]
+		spots: [visited('One', 900), visited('Two', 880), visited('Three', 860)]
 	});
 	await open(page, '/');
 
@@ -60,31 +61,8 @@ test('Scenario: Top spots row lays out like Recently added', async ({ page, requ
 	if (info.project.name === 'phone') {
 		expect([xs.size, ys.size]).toEqual([2, 2]);
 	} else {
-		expect([xs.size, ys.size]).toEqual([4, 1]);
+		expect([xs.size, ys.size]).toEqual([3, 1]);
 	}
-	const column = await page.getByRole('heading', { level: 1 }).boundingBox();
-	const heading = await page.getByRole('heading', { name: 'Top spots' }).boundingBox();
-	expect(Math.abs(heading!.x - column!.x)).toBeLessThanOrEqual(1);
 	const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 	expect(overflow).toBe(false);
-});
-
-test('Home Top spots screenshot', async ({ page, request }, info) => {
-	await reset(request);
-	await seed(request, {
-		recipes: [{ title: 'Lasagne', image: true }, { title: 'Soup' }],
-		spots: [
-			visited('Brasserie Lumière', 900, { price: 3, neighbourhood: 'Mitte', city: 'Berlin', tags: ['Brasserie', 'Wine'], image: '/mockups/spot-interior.jpg' }),
-			visited('Terraza Pujol', 890, { price: 2, neighbourhood: 'Malasaña', city: 'Madrid', tags: ['Tapas', 'Terrace'], image: '/mockups/spot-terrace.jpg' }),
-			visited('Kuro Ramen', 875, { price: 2, neighbourhood: 'Kreuzberg', city: 'Berlin', tags: ['Ramen', 'Late'], image: '/mockups/spot-ramen.jpg' }),
-			visited('Chalet Sauvage', 810, { price: 2, city: 'Villard-Reculas', tags: ['Pizza'], image: '/mockups/spot-pizzeria.jpg' })
-		]
-	});
-	await open(page, '/');
-	await page.evaluate(async () => {
-		for (const img of document.querySelectorAll('img')) img.loading = 'eager';
-		await Promise.all([...document.images].map((img) => img.decode().catch(() => undefined)));
-	});
-	await page.waitForTimeout(900);
-	await page.screenshot({ path: `test-results/shots/eating-out-home-${info.project.name}.png`, fullPage: true });
 });

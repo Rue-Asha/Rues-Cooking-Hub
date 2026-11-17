@@ -2,7 +2,7 @@
 
 This document states what the app does. It says nothing about how it looks. A redesign may change layout, components, motion, colour and typography freely, but must keep every behavior, state, validation rule and the English copy listed here. Sources: README, `openspec/specs/*`, the e2e suite in `e2e/`, and behavior-only reads of the route code. Accessibility target: WCAG 2.2 level AA (see section 5). Rue's gate-1 decisions are applied throughout and listed in section 10.
 
-Words in this contract: "area" is one of the four top-level destinations (Home, Recipes, Plan, List). "Slot" is one of the four meals of a day (Breakfast, Lunch, Dinner, Snacks). "Dialog" means any modal interaction that blocks the rest of the page until it is answered or dismissed. "Context label" is a short line of copy that names the area or task a heading belongs to; the strings are fixed, where and how they appear is not.
+Words in this contract: "area" is one of the five top-level destinations (Home, Recipes, Plan, List, Eating Out). "Slot" is one of the four meals of a day (Breakfast, Lunch, Dinner, Snacks). "Dialog" means any modal interaction that blocks the rest of the page until it is answered or dismissed. "Context label" is a short line of copy that names the area or task a heading belongs to; the strings are fixed, where and how they appear is not.
 
 ## 1. Purpose and usage context
 
@@ -26,7 +26,8 @@ Users: one household (a single person, "Rue", no accounts, no login, no multi-us
 - J12. Build a shopping list from the plan: ingredients scaled by servings, merged by name and unit, grouped by aisle.
 - J13. Keep the list by hand: add items by typing a line, edit names and amounts, delete, recategorise.
 - J14. Shop: tick items off, see them gather in a Checked group, clear checked items.
-- J15. Move between the four areas from anywhere, and never lose unsaved recipe edits by accident.
+- J15. Move between the five areas from anywhere, and never lose unsaved recipe edits by accident.
+- J16. Keep a list of food spots to try and visited ones with a score: add a spot, find it again by search, tag, city and price, open it, mark it visited, edit or delete it.
 
 ## 3. Entities
 
@@ -80,6 +81,7 @@ Serves: J1, J15 (and entry to J2, J9, J12).
 
 Data shown:
 - Page title "Rues Cooking Hub". Today's weekday and date. A greeting heading ("What's cooking, Rue?"). A summary sentence: "N meals planned this week, N things to buy." (singular forms for 1: "1 meal", "1 thing"; "meals" counts every entry of the week, recipe and free text).
+- The head carries the overline "Welcome · Your kitchen" and a dark "Your kitchen" facts card with the recipe count, the meals planned this week and the open list items. The sections run in this order: today's recipe (hero), "This week", "Shopping list", "Favourite", "Recently added", "Top spots". The "This week" range text is itself the link to `/plan`; each open list item shows a display-only empty check circle; "Top spots" shows up to three spots (two columns on a phone, three on desktop).
 - Today's recipe: today's planned recipe (the first Dinner recipe entry of today, else the first recipe entry of today by slot and position): image or placeholder, title, a label ("Tonight · Dinner" for Dinner, otherwise "Today · <slot>"), total minutes when present, "Serves N", the first tag if any.
 - If no recipe is planned today but recipes exist: the newest recipe takes that place, with "Plan your day".
 - If the archive is empty: a welcome message ("Every recipe worth keeping, in one place" with an explanatory line) and "Add your first recipe".
@@ -161,10 +163,10 @@ Serves: J3, J6, J7, J11, J15. Unknown or non-numeric id answers 404.
 
 Data shown:
 - Page title "<title> · Rues Cooking Hub". Back link "Back to recipes" to `/recipes`.
-- Recipe image or the placeholder ("No photo yet").
-- Info: tags (or "Recipe" when none), favourite toggle, title, description (only when present), times line "Prep 10 min · Cook 20 min · 30 min total" (parts shown only when set; absent when no times), "N servings", "Source" link with the host (only with a source URL; opens in a new tab).
+- Recipe image or the placeholder ("No photo yet"). The photo is the shell's stage behind the page; it does not move on scroll (no hero parallax) and the recipe page has no hero component of its own.
+- Info: tags (or "Recipe" when none), favourite toggle, title (the accent word is the last word of the visible part; a title of about 100 characters or more is cut back to its last whole word and ends in "…", the full title kept as a tooltip), description (only when present; clamped to three lines with a "More" button that expands it to "Less", the button shown only when the text is actually cut), times line "Prep 10 min · Cook 20 min · 30 min total" (parts shown only when set; absent when no times), "N servings", "Source" link with the host (only with a source URL; opens in a new tab).
 - There is no planned status on the recipe page; the only route to the plan from here is "Add to plan".
-- "Ingredients" with "for N" (N is the servings the ingredients are currently scaled to, initially the recipe's servings): by section (section titles as headings), each line's text; "No ingredients yet." when none. A servings control scales them (see Actions).
+- "Ingredients" with "for N" (N is the servings the ingredients are currently scaled to, initially the recipe's servings): by section (section titles as headings), each line's text; "No ingredients yet." when none. The "Scale to servings" control sits in the segment bar of the header and scales them in the browser (`scaleIngredient`; see Actions).
 - "Method": steps by section, numbered continuously, Markdown rendered; "No steps yet." when none.
 - "Notes" (only when present): rendered Markdown.
 
@@ -172,8 +174,10 @@ Actions:
 - Favourite toggle: switches the flag, records when it was favourited, updates instantly without page reload; accessible name "Add <title> to favourites" / "Remove <title> from favourites", state exposed via `aria-pressed`. Persists across reload; the recipe then appears under the archive's Favourites filter.
 - Scale servings: a control labelled "Scale to servings" (group name "Scale recipe") with a number field starting at the recipe's servings, buttons "Scale down" and "Scale up" (one serving each) and, whenever the value differs from the recipe's servings, "Reset to N servings". Whole numbers, at least 1; a value below 1 or not whole is not applied, the previous scale stays and the alert "Servings must be at least 1" is shown. Scaling is a view only: nothing is stored, the recipe's servings stay, "Add to plan" still defaults to the recipe's servings, and the scale resets on reload and on leaving the page. Scaling multiplies each ingredient line's quantity by (chosen servings / recipe servings). A scaled line reads quantity, unit, name and note in that order (quantities shown with at most two decimals, trailing zeros dropped, a range line keeps both ends and scales both, so "2–3 cloves" at double servings reads "4–6 cloves"); a line with no readable quantity is shown unchanged; at the recipe's own servings every line shows its original text. "for N" and the line texts update at once without reload and without moving focus away from the control. Steps, notes and times are not scaled.
 - "Add to plan": dialog titled "Add to plan" (context label is the recipe title) with a day picker (seven days of a week, defaults to today's week and today; "Earlier week" and "Later week" step the shown week), a meal choice (Breakfast, Lunch, Dinner, Snacks; default Dinner), servings (default the recipe's servings, at least 1, with "Fewer servings" and "More servings" buttons and a number field). Confirm "Add to plan" appends a recipe entry at the end of that slot, then the dialog shows a status "Added to <Weekday> · <Slot>" with "Done" and "Open the week" (to `/plan?week=<monday>`). Servings below 1: alert "Servings must be at least 1", nothing added.
-- "Edit": goes to `/recipes/<id>/edit`.
-- "Delete recipe": dialog titled "Delete “<title>”?" (context label "Delete recipe"); when plan entries use it: "It's used in N plan entries; they'll stay in the plan as text." (singular: "It's used in 1 plan entry; it'll stay in the plan as text."); with none, no extra line. "Cancel" and "Delete". On delete: recipe and image removed, plan entries become text, list unchanged, the archive opens.
+- Action placement: the rail holds only "Back to recipes" and the favourite toggle. "Edit" and "Delete recipe" sit in the overflow menu of the `.detail-actions` pill (button "More recipe actions", `aria-haspopup="menu"`, menu named "More actions"); Escape or focus leaving closes it.
+- Keep awake: while the page is open the screen is kept awake (`keepAwake()`, the Screen Wake Lock where the browser has it; nothing happens where it has not).
+- "Edit": menu item, goes to `/recipes/<id>/edit`.
+- "Delete recipe": menu item; dialog titled "Delete “<title>”?" (context label "Delete recipe"); when plan entries use it: "It's used in N plan entries; they'll stay in the plan as text." (singular: "It's used in 1 plan entry; it'll stay in the plan as text."); with none, no extra line. "Cancel" and "Delete". On delete: recipe and image removed, plan entries become text, list unchanged, the archive opens.
 - "Source": external link.
 
 Required states: with and without image, source, times, description, notes; scaled up, scaled down and at the recipe's own servings; scaled lines with and without quantity; invalid scale value X; no ingredients; no steps; one section and many sections; overlong title, description and lines T; 404 X; loading n/a; Markdown with HTML or scripts shows them as inert text.
@@ -191,7 +195,8 @@ Fields and controls:
 - "Ingredients": ingredient sections (group name "Ingredient section N"), each with "Section title" (placeholder "Section title (optional)"), lines labelled "Ingredient line" (Enter adds a new line right after it and focuses it), a live parse of each non-empty line (group "Parsed ingredient": quantity, unit, name, note, or "no amount"), "Remove line" (when more than one line), "Add line", "Remove section" (when more than one section), "Add ingredient section".
 - "Method": step sections (group name "Step section N"), lines labelled "Step N" (multi-line text; placeholder "Describe the first step" on the first), "Remove step" when more than one, "Add step", "Remove section", "Add step section".
 - "Notes" (placeholder "Tips, variations, storage. Markdown works.").
-- Actions "Cancel" and "Save recipe" (currently offered twice, before and after the fields; tests use the first instance); while saving, "Save recipe" reads "Saving…" and is disabled.
+- Actions "Cancel" and "Save recipe": offered once, in a bar fixed to the bottom of the viewport (on the phone directly above the phone bar, from 1024 px at the bottom right), so Save is reachable from anywhere in a long form; the bar lives outside the form element and its Save names the form. While saving, "Save recipe" reads "Saving…" and is disabled. The form is two columns from 768 px.
+- Photo placeholder: neutral (an image mark) until the title has a letter; then the plate with the title's first letter.
 
 Actions and validation (server-authoritative, mirrored in the form; each error is attached to its field (`aria-invalid` and the field's accessible description); after a failed save focus moves to the first invalid field; an error disappears as soon as its field is edited and comes back with the next server answer; the form stays, input kept, nothing stored):
 - Empty title: "Title is required".
@@ -217,7 +222,7 @@ Required states: as 4.6 plus 404 X.
 
 Serves: J8.
 
-Data shown: title "Tags · Rues Cooking Hub", heading "Manage tags", context label "Archive" with tag count ("1 tag", "N tags"), explanatory line ("Rename a tag onto one that already exists and the two become one. New tags are added while editing a recipe."), link "All recipes" to `/recipes`, the list (accessible name "Tags") of every tag with its recipe count ("0 recipes", "1 recipe", "N recipes"), and a status area for outcomes.
+Data shown: title "Tags · Rues Cooking Hub", heading "Manage tags", context label "Archive" with tag count ("1 tag", "N tags"), explanatory line ("Rename a tag onto one that already exists and the two become one. New tags are added while editing a recipe."), link "All recipes" to `/recipes`, the list (accessible name "Tags") of every tag with its recipe count ("0 recipes", "1 recipe", "N recipes"), a facts list ("Tag totals": tags, in use, unused) and a status area for outcomes. With no tags: the empty state "No tags yet" with "Tags are added while you edit a recipe." and the link "All recipes"; no list and no facts.
 
 Actions:
 - "Rename <name>": opens a rename form for that tag (replacing the tag's actions while open) with a field labelled "New name for <name>" prefilled with the current name, "Save", "Cancel"; Escape cancels. Empty name: "Enter a name". Renaming onto an existing name (ignoring case) merges, status "Merged <from> into <into>"; otherwise the tag and all its recipes show the new name.
@@ -233,11 +238,13 @@ Serves: J9, J10, J11 (landing), J15.
 
 Data shown:
 - Title "Plan · Rues Cooking Hub". Heading: "This week", "Next week", "Last week", or "Week N" for other weeks; context label with week number and date range (for example "19 – 25 October"). Week is chosen by `?week=<any iso date>`, normalised to that week's Monday; default is the week containing today.
-- Seven days Monday to Sunday, each with the weekday and day number; today is marked ("Today"). Each day has four slots (Breakfast, Lunch, Dinner, Snacks); a slot is a group named "<Weekday> <Slot>" holding any number of entries in position order. Each slot always offers an add control named "Add to <Weekday> <Slot>".
-- Entry: recipe entries show title, image or placeholder and servings ("N servings"); free-text entries show the text. Each entry has an "Options for <title>" control.
-- Recipe picker (a complementary region named "Recipes") listing all recipes sorted by title, each with image or placeholder, title and minutes; it is the drag source for adding recipes; a search field "Find a recipe" (placeholder "Find a recipe"), "No recipes yet" when the archive is empty and "No recipes match" when the search finds nothing; on drag-capable devices a hint "Drag onto a day".
+- Layout: from 1024 px the shown week is a table, one day per row and one column per slot (Breakfast, Lunch, Dinner, Snacks), the recipe picker beside it; below 1024 px (phones and tablets, 768–1023 px included) the seven days are stacked in one column, each day a card holding its four slots, with a sticky "Jump to a day" bar of seven links. A day without entries is compact on the phone (shorter than a day with one entry) and still offers its four add controls. Today's day carries `aria-current="date"`; on the stacked layout it is scrolled to the top of the view on load when the shown week contains today, otherwise the view starts at Monday. A week with the 28 slots empty shows the note "Nothing planned yet — tap + to add a meal" (hidden on a desktop with a mouse). A line "Planned per meal" counts the entries per slot when the week has any.
+- Seven days Monday to Sunday, each with the weekday and day number; today is marked ("Today"). Each day (a region named by its weekday) has four slots (Breakfast, Lunch, Dinner, Snacks); a slot is a group named "<Weekday> <Slot>" holding any number of entries in position order. Each slot always offers an add control named "Add to <Weekday> <Slot>".
+- Entry: recipe entries show title, image or placeholder and servings ("N servings", "1 serving"); free-text entries show the text. Each entry has an "Options for <title>" control.
+- Recipe picker (a complementary region named "Recipes", shown only from 1024 px on a device with a fine pointer) listing all recipes sorted by title, each with image or the plate with the title's first letter, title and minutes ("No times" when it has none); it is the drag source for adding recipes; a search field "Find a recipe" (placeholder "Find a recipe"), "No recipes yet" when the archive is empty and "No recipes match" when the search finds nothing; on drag-capable devices a hint "Drag onto a day".
 
 Actions:
+- Context add: the phone bar's "+" ("Add to plan") and `/plan?add=1` (the Home sheet's "Plan entry") open the Add dialog for today's Dinner when the shown week contains today, otherwise for Monday Dinner of the shown week; the dialog stays bound to that one slot. After opening from `?add=1` the flag is removed from the URL (history replaced). Entry and add forms post with the shown `?week=` so the page stays on that week.
 - Previous and next week ("Previous week", "Next week", links that change `?week=`), "This week" (back to the current week).
 - Add entry: the add control opens a dialog (context label "Add to plan", title "<Weekday> · <Slot>", accessible name "Add to <Weekday> <Slot>") with choice "Recipe" or "Free text". Recipe mode: search field "Search recipes" (placeholder "Search recipes"; focused on open only on fine-pointer devices), result list with title, "N servings" and minutes, "No recipes yet" or "No recipes match" when empty; picking a recipe reveals a "Servings" number field prefilled with the recipe's servings and "Add to plan". Free text mode: field "Text" (placeholder "Pizza night, leftovers, eating out") and "Add to plan". The entry is appended at the end of the slot. Errors shown in the dialog: empty text "Enter a recipe or some text"; servings below 1 "Servings must be at least 1".
 - Entry options menu (keyboard reachable; opens with focus on the first item; Escape closes and returns focus to the trigger): "Change servings" (recipe entries) or "Edit text" (free text) opens an edit form for that entry with field "Servings" or "Text", "Save" and "Cancel", errors as above; "Move to…"; "Delete" (immediate, no confirm).
@@ -255,10 +262,11 @@ Serves: J12, J13, J14.
 
 Data shown:
 - Title "List · Rues Cooking Hub", heading "Things to buy", context label "Shopping list" plus "N open".
-- An add field (accessible name "Add an item", placeholder "Add an item, e.g. 2 l oat milk"), an "Add from plan" button, and a status area announcing "Added N item(s) from the plan" (singular "Added 1 item from the plan"; clears itself after about 6 seconds).
+- An add field under the title (accessible name "Add an item", placeholder "Add an item, e.g. 2 l oat milk"), an "Add from plan" button, and a status notice (the shared Status component, `role="status"`) announcing "Added N item(s) from the plan" (singular "Added 1 item from the plan"; clears itself after about 6 seconds).
 - "To buy" (region) with supporting line "By aisle": open items grouped by category (Produce, Dairy & Eggs, Meat & Fish, Bakery, Pantry, Frozen, Drinks, Household, Other in that order, empty categories omitted), each group named by its label with an item count. Empty: "Nothing to buy" with "Type an item above, or add the ingredients of the meals you planned."
 - Item: a checkbox named by the item's name; the name; the amount (or none); items that came from the plan are marked as such ("From the plan"); an item merged from manual and plan parts shows the combined amount with "incl. <plan part> from plan".
-- "Checked N" (region named starting "Checked", after all categories in reading order, present whenever the list has any item): checked items (list named "Checked items"); "Tick things off as you shop; they gather here." when none; "Clear checked" button, disabled when nothing is checked.
+- "Open per aisle" facts card (list named "Open per aisle", one count per aisle) in the header, shown only when the list has more than two aisle groups and only from 768 px; hidden below 768 px because the aisle heads carry the counts. /list has no stage photo.
+- "Checked N" (region named starting "Checked", after all categories in reading order, always rendered, also on an empty list): checked items (list named "Checked items", names struck through with `text-decoration`); the hint "Tick things off as you shop; they gather here." when none; "Clear checked" button, disabled when nothing is checked.
 
 Actions:
 - Add item: type a line and press Enter. The line is parsed like an ingredient line (`2 l milk` gives name `milk`, amount 2 l). Empty or whitespace adds nothing. A name equal (ignoring case, singular/plural folded) to an open manual item merges amounts into it. The new item takes the category last remembered for its name, else Other. The field empties after adding.
@@ -278,13 +286,71 @@ Keyboard and touch: the add field submits on Enter (phone keyboard "done" key); 
 - `GET /images/<id>`: serves a stored image with `Cache-Control: public, max-age=31536000, immutable`; unknown or non-numeric id answers 404.
 - `GET /healthz`: `ok` with 200 while the database answers, 503 otherwise.
 
+### 4.12 `/eating-out` Eating Out list
+
+Serves: J16, J15 (landing).
+
+Data shown:
+- Title "Eating Out · Rues Cooking Hub", heading "Eating Out", context label "Spots" with the place count ("1 place", "N places"; only "Spots" with no spots).
+- The head shows the heading "Eating Out" with the last word as accent, the lede "The places you loved, and the ones you still want to try." and an "Add spot" dark arrow pill to `/eating-out/new`. With spots it also holds a dark facts card ("Spot totals") with the Visited and Want to go counts.
+- With no spots at all: an EmptyState (heading "Start your list", "Keep the places you loved, and the ones you still want to try." and an "Add spot" button to `/eating-out/new`; no placeholder image) and no segment, filters or list.
+- With spots the body is one card ("Your spots") with the place count as its note.
+- The status switch (group "Status") "Visited" | "Want to go", each with the number of matching spots; the pressed side is the chosen one. Without a status in the URL it is Visited, unless no spot is Visited and at least one is Want to go, then Want to go.
+- A search field (accessible name "Search spots", placeholder "Search spots, areas or tags") matching name, neighbourhood, city, tag names and notes ignoring case including non-ASCII letters; a sort select ("Sort spots": "Highest score", "Newest first", "Name A–Z"; "Highest score" is not offered on Want to go; defaults: Highest score on Visited, Newest first on Want to go); a group "Filter spots" with spot-tag chips (the search, sort and city fields are the design system's Field and select) (several combine, a spot must have all), a city select ("City": "All cities" and the cities in use, compared ignoring case) and a price filter (€, €€, €€€, €€€€; single choice). Tags and cities list only values in use; segment counts follow search and filters.
+- Spot rows in a grid (list named "Spots"; each row an `<article>` whose photo is `Picture.svelte`, which shows the plate when there is no photo): photo or plate, name (two lines at most), at most two spot tags, "Neighbourhood, City" with whichever parts exist, the price as € signs, and on Visited cards the score with two decimals ("8.75"); while sorted by score, Visited cards show a rank ("#1", "#1", "#3": equal scores share a rank, counted within the filtered list). Each card links to `/eating-out/<id>`.
+- Segment, search, filters and sort live in the URL (`status`, `q`, `tags`, `city`, `price`, `sort`), so reload and back/forward restore them; a tag, city or price that does not exist is ignored.
+
+Actions:
+- Switching the segment keeps the sort when it is valid for the target side, else uses that side's default. "Add spot" (head, empty state, empty side): `/eating-out/new`. Opening a card: `/eating-out/<id>`, with the photo (or placeholder) as a shared element when view transitions are supported and reduced motion is not requested.
+- "Clear filters" (when nothing matches): clears search and filters, keeps segment and sort.
+
+Required states: empty list ("Start your list") E; chosen side empty ("No visited spots yet." / "Nothing on your want-to-go list yet." with "Add spot"); no match ("No spots match", "Try fewer tags or a different word.", "Clear filters"); one and many spots 1 N; sparse row (no photo, location, price, tags or badge); overlong name T (clamped, no horizontal overflow down to 320 px); loading: server-rendered, n/a; error n/a (stale URL values are ignored).
+
+Keyboard and touch: segment sides are toggle buttons; each row is one link; every control is at least 44 px high on a phone; "Search spots" in the header opens `/eating-out#search` with the search field focused.
+
+### 4.13 `/eating-out/new` Add spot
+
+Serves: J16.
+
+Data shown: title "Add spot · Rues Cooking Hub", heading "A new spot", context label "Eating Out · New". The spot form (4.15 below) empty: status "Want to go", no score field.
+
+Actions: "Save spot" (once, at the end of the form, not sticky) stores the spot and opens `/eating-out/<id>`; "Cancel" returns to `/eating-out`. Leaving the form with unsaved changes asks "Discard changes?" ("Keep editing", "Discard"); an untouched form leaves without asking. Server answers: blank name "Name is required"; Visited without a score "Visited spots need a score"; an invalid score "Enter a score from 1.00 to 10.00, at most two decimals"; a website that is not an http(s) URL "Enter a valid web address (http or https)"; nothing is stored and the other values stay filled.
+
+Required states: empty, errors X, saving ("Saving…") L, photo present and absent, overlong text T.
+
+Keyboard and touch: as the form's fields: labels on every input, the score field brings up the decimal keyboard (`inputmode="decimal"`), the website field the URL keyboard; the first invalid field takes focus after a failed save.
+
+### 4.14 `/eating-out/[id]` Spot page
+
+Serves: J16.
+
+Data shown: title "<name> · Rues Cooking Hub". Unknown or non-numeric id answers 404. The photo sits on the shell's stage (a plate with the name's first letter, labelled "No photo yet", when there is none) and is the shared element with the list row (the same carries back). A "Back to Eating Out" link sits in the rail. The head shows a kicker with the status label ("Visited" / "Want to go") and up to three spot tags, the name as heading with its last word as accent, and a seg bar: price as € signs ("Price"), "Where" with "Neighbourhood, City" (each only when present) and, on Want to go, the "Mark visited" dark arrow pill. Cards: a charcoal "Score" card with the score as two decimals and "out of 10" (Visited), or "–" with "not visited yet" when there is no score, plus any further spot tags ("More tags"; no rank); a "Details" card (only with an address or website) with an "Address" row and "Open in Maps" (links to Google Maps search for name, address and city) and a "Website" row with the host and "Visit"; a "Notes" card rendered like recipe notes (only with notes). Both external links open in a new tab with `rel="noopener noreferrer"` and read "(opens in a new tab)" to screen readers; the page itself requests nothing from another origin.
+
+Actions:
+- "Mark visited" (Want to go only): sheet "Mark visited" with the score field, "Cancel" and "Save"; an invalid score shows the message in the sheet and keeps it open; save sets Visited with the score and the page shows it.
+- The "More spot actions" button (`.detail-actions`, a menu button) opens a menu: "Edit" goes to `/eating-out/<id>/edit`; "Delete spot" opens the dialog "Delete “<name>”?" with "Cancel" and "Delete"; on confirm the spot, its photo and its tag links are deleted and `/eating-out` opens. A spot tag no spot uses any more disappears.
+
+Required states: Visited and Want to go; photo on the stage and plate; address, website and notes each present or absent; many tags; overlong name T; 404 X; loading n/a.
+
+Keyboard and touch: sheet and dialog trap focus and close on Escape; actions are touch-sized.
+
+### 4.15 `/eating-out/[id]/edit` Edit spot
+
+Serves: J16. Unknown id answers 404. Title "Edit <name> · Rues Cooking Hub", heading "Edit spot", context label "Eating Out · Edit". The form is prefilled with every stored value (score as "8.75", price, tags, photo); the form heading is the spot's name; "Cancel" returns to `/eating-out/<id>`. Save updates the spot and opens its page. Switching Visited to Want to go clears the score on save; switching Want to go to Visited requires a score. "Remove image" deletes the photo. Notices (status): "Saved without image: the image couldn't be downloaded." and "The new image couldn't be downloaded; the previous image was kept.".
+
+The spot form (used by 4.13 and 4.15) is built from the design system's Field and Button on two cards, "The place" and "Details"; the actions ("Cancel", "Save spot") sit in flow, not fixed, so Save is at the form's end. The recipe form's Save bar on `<body>` is not used here. Heading "Add spot" (or the spot's name), "Only the name is required; Visited asks for a score"; section "The place": photo (upload, URL or remove, as the recipe form: "That file isn't an image", "Images can be at most 15 MB"), "Name" (required), "Status" segment "Want to go" | "Visited" (default Want to go), "Score" (only while Visited; decimal 1.00 to 10.00, at most two decimals, dot or comma accepted, stored as hundredths; its error is the field's accessible description, with `aria-invalid`); section "Details": spot tags (suggests spot tags only; the recipe tags are separate), "Price" (€ to €€€€, optional, "Clear"), "City", "Neighbourhood", "Address", "Website", "Notes" (all optional).
+
+Required states: as 4.13 plus 404 X.
+
 ## 5. Cross-cutting behavior
 
-- Navigation: four areas are reachable from every page: Home `/`, Recipes `/recipes`, Plan `/plan`, List `/list` (navigation named "Main", links named "Home", "Recipes", "Plan", "List"). The current area is marked with `aria-current="page"`, also on pages within it (`/recipes/12`, `/recipes/new/form`, `/recipes/tags` all mark Recipes). At every viewport width the navigation offers the same actions: the brand name "Rues Cooking Hub" (link home), an "Add recipe" action (to `/recipes/new`) and a "Search recipes" action (to `/recipes`, where the search field takes focus on arrival), besides the four area links; how they are presented may differ by width, availability does not. Content is never covered by the navigation at any viewport, including a tablet and a phone in landscape. Exactly one navigation named "Main" is exposed to users and assistive tech at a time, whatever the viewport.
+- Navigation: five areas are reachable from every page: Home `/`, Recipes `/recipes`, Plan `/plan`, List `/list`, Eating Out `/eating-out` (navigation named "Main", links named "Home", "Recipes", "Plan", "List", "Eating Out"; on the phone the Eating Out pill is labelled "Spots"). The current area is marked with `aria-current="page"`, also on pages within it (`/recipes/12`, `/recipes/new/form`, `/recipes/tags` all mark Recipes). At every viewport width the navigation offers the same actions: the brand name "Rues Cooking Hub" (link home), an "Add recipe" action (to `/recipes/new`) and a "Search recipes" action (to `/recipes`, where the search field takes focus on arrival), besides the five area links; within Eating Out the actions are "Add spot" (to `/eating-out/new`) and "Search spots" (to `/eating-out#search`, where the spot search field takes focus), and `/eating-out/*` pages mark Eating Out with `aria-current="page"`; how they are presented may differ by width, availability does not. Content is never covered by the navigation at any viewport, including a tablet and a phone in landscape. Exactly one navigation named "Main" is exposed to users and assistive tech at a time, whatever the viewport.
+- Phone navigation: below 1024 px (tablets and landscape phones included) the navigation is the phone bar at the bottom, five pills (Home, Recipes, Plan, List, Spots; icon-only below 360 px, the label stays the accessible name) and a separate round "+"; from 1024 px it is the top bar, and exactly one of the two is shown. Above the content a top strip carries the brand (its mark only on narrow screens), the "Search recipes" icon and "Add recipe" (on Eating Out pages "Search spots" and "Add spot"), so both are reachable with no tap first. While a text field has focus the phone bar is hidden and inert, and returns when focus leaves it.
+- Context add ("+"): its name and action follow the area: Recipes pages "Add recipe" (to `/recipes/new`), Plan "Add to plan" (the Add dialog), List "Add an item" (focuses the add field), Eating Out pages "Add spot" (to `/eating-out/new`), Home "Add to your kitchen" (a modal choice sheet with "Recipe", "Plan entry" and "List item"; it closes on Escape, its close control, an outside tap and the browser's back, and focus returns to the "+"). On the recipe form routes (`/recipes/new`, `/recipes/new/form`, `/recipes/[id]/edit`) the "+" is hidden and inert. Every in-app way out of the recipe form that the navigation offers goes through the unsaved-changes guard.
 - Scroll state: after scrolling more than 48 px the navigation reports a scrolled state (`data-compact`, see 7) and drops it again when back within 48 px of the top. How, or whether, the presentation changes is free; link names stay available to assistive tech in both states, and under reduced motion any change is instant.
 - Page transitions: navigation between areas and from a recipe in a list to its page use view transitions when the browser supports them and reduced motion is not requested; otherwise navigation is instant and error-free. Reduced motion (`prefers-reduced-motion`) disables all non-essential motion: entrance animations, scroll-linked motion, transitions between pages, animated reordering when filtering the archive, and animated movement of checked list items; behavior stays identical.
 - Persistence: all data is server-side SQLite; every mutation persists across reload. There are no accounts. The filter state of the archive and the shown week of the plan live in the URL. The UI applies some changes optimistically (favourite toggles, list check and clear, category moves) and settles to server state after the request.
-- Offline and sync: none. No service worker, no manifest, no background sync. A failed request is not queued.
+- Offline and sync: none. No service worker and no background sync; a web manifest exists for the icon only. A failed request is not queued.
 - Local draft: a new or imported recipe form with edits keeps a draft in the browser (see Entities, Recipe draft). Returning to `/recipes/new` or `/recipes/new/form` after reload, closing the tab or leaving the page restores it with status "Restored your unsaved draft"; "Discard draft" and a successful save clear it, as does "Discard" in the discard dialog. Because the draft survives, reload and tab close no longer need the browser's own confirmation.
 - Unsaved-changes guard: on the recipe form, leaving by in-app navigation with edits cancels the navigation and asks "Discard changes?" ("What you changed on this recipe isn't saved yet.") with "Keep editing" (stay, edits kept) and "Discard" (continue to the destination). Escape in the dialog keeps editing. Typing back to the original value is not a change. Leaving without changes asks nothing. Edits to new or imported recipes are kept as a local draft (above); editing an existing recipe has no draft. A successful save navigates away without asking.
 - Import flow: the single entry is `/recipes/new` (link in, server reads, editable preview, save). Fallback and duplicate handling per 4.3. Server-side import reading, normalisation of source URLs and the duplicate check are part of the behavior.
@@ -308,6 +374,10 @@ Every UI string matched exactly (getByText, getByRole name, getByLabel, placehol
 | Recipes | Recipes | na, tr, jo |
 | Plan | Plan | na, rf, tr, jo |
 | List | List | na, tr, jo |
+| Eating Out | Eating Out | none yet |
+| Spots (phone pill) | Spots | none yet |
+| Search spots | Search spots | none yet |
+| Add spot | Add spot | none yet |
 | Main (navigation name) | Main | na, jo, tr |
 | Add your first recipe | Add your first recipe | ar, ho |
 | Start your archive | Start your archive | fe |
@@ -377,8 +447,8 @@ Every UI string matched exactly (getByText, getByRole name, getByLabel, placehol
 | Discard changes? | Discard changes? | rf |
 | Keep editing | Keep editing | rf |
 | Discard | Discard | rf |
-| Restored your unsaved draft (new) | Restored your unsaved draft | none yet (rf to add) |
-| Discard draft (new) | Discard draft | none yet (rf to add) |
+| Restored your unsaved draft (new) | Restored your unsaved draft | rf |
+| Discard draft (new) | Discard draft | rf |
 | Cancel | Cancel | rf, re, rp |
 | Remove image | Remove image | ri |
 | Title is required | Title is required | im, rf |
@@ -404,6 +474,9 @@ Every UI string matched exactly (getByText, getByRole name, getByLabel, placehol
 | Scale recipe (group name, new) | Scale recipe | none yet |
 | Scale down / Scale up (new) | Scale down / Scale up | none yet (rp to add) |
 | Reset to 4 servings (new) | Reset to N servings | none yet (rp to add) |
+| More / Less (lede toggle, new) | More / Less | none yet |
+| More recipe actions (overflow button, new) | More recipe actions | none yet |
+| More actions (overflow menu name, new) | More actions | none yet |
 | Method | Method | rp |
 | Dinner | Dinner | jo, rp, pm |
 | Breakfast / Snacks | Breakfast / Snacks | pm |
@@ -449,6 +522,7 @@ Every UI string matched exactly (getByText, getByRole name, getByLabel, placehol
 | To buy | To buy | jo, lp, lc, li |
 | Checked (region name prefix) | Checked | lc |
 | Clear checked | Clear checked | lc |
+| Open per aisle (facts list, new) | Open per aisle | none yet |
 | Dairy & Eggs / Produce / Other | Dairy & Eggs / Produce / Other (all nine categories keep their names) | lc, li |
 | Edit <name> (item and form) | Edit <name> | li |
 | Move <name> to another category | Move <name> to another category | li |
@@ -457,8 +531,58 @@ Every UI string matched exactly (getByText, getByRole name, getByLabel, placehol
 | Amount | Amount | li |
 | Enter an amount like 200 g | Enter an amount like 200 g | li |
 | From plan: 500 ml | From plan: <amount> | li |
+| Start your list | Start your list | none yet |
+| Keep the places you loved, and the ones you still want to try. | Keep the places you loved, and the ones you still want to try. | none yet |
+| Visited / Want to go (status segment) | Visited / Want to go | none yet |
+| No visited spots yet. | No visited spots yet. | none yet |
+| Nothing on your want-to-go list yet. | Nothing on your want-to-go list yet. | none yet |
+| Search spots, areas or tags | Search spots, areas or tags | none yet |
+| Sort spots | Sort spots | none yet |
+| Highest score / Newest first / Name A–Z | Highest score / Newest first / Name A–Z | none yet |
+| Filter spots | Filter spots | none yet |
+| City: <name> / All cities | City: <name> / All cities | none yet |
+| No spots match | No spots match | none yet |
+| Try fewer tags or a different word. | Try fewer tags or a different word. | none yet |
+| Clear filters | Clear filters | none yet |
+| Add a place | Add a place | none yet |
+| A tip from a friend, a corner you walked past | A tip from a friend, a corner you walked past | none yet |
+| A new spot / Edit spot | A new spot / Edit spot | none yet |
+| Only the name is required; Visited asks for a score | Only the name is required; Visited asks for a score | none yet |
+| The place / Details | The place / Details | none yet |
+| Save spot / Saving… | Save spot / Saving… | none yet |
+| Name is required (spot) | Name is required | none yet |
+| Visited spots need a score | Visited spots need a score | none yet |
+| Enter a score from 1.00 to 10.00, at most two decimals | Enter a score from 1.00 to 10.00, at most two decimals | none yet |
+| Enter a valid web address (http or https) | Enter a valid web address (http or https) | none yet |
+| Mark visited | Mark visited | none yet |
+| Open in Maps / Visit | Open in Maps / Visit | none yet |
+| Back to Eating Out | Back to Eating Out | none yet |
+| The places you loved, and the ones you still want to try. | The places you loved, and the ones you still want to try. | none yet |
+| Spot totals / Your spots / Eating Out list | Spot totals / Your spots / Eating Out list | none yet |
+| More spot actions / Edit / Delete spot | More spot actions / Edit / Delete spot | none yet |
+| Score / out of 10 / – / not visited yet | Score / out of 10 / – / not visited yet | none yet |
+| Price / Where / Details / Notes (spot page) | Price / Where / Details / Notes | none yet |
+| No photo yet (spot plate) | No photo yet | none yet |
+| Delete “<name>”? (spot) | Delete “<name>”? | none yet |
+| Enter whole minutes, 0 or more | Enter whole minutes, 0 or more | none yet |
+| Add to your kitchen (Home "+" label and choice sheet title) | Add to your kitchen | none yet |
+| Add recipe (Recipes "+" label) | Add recipe | none yet |
+| Add to plan (Plan "+" label) | Add to plan | none yet |
+| Add an item (List "+" label) | Add an item | none yet |
+| Add spot (Eating Out "+" label) | Add spot | none yet |
+| Recipe (Home choice sheet) | Recipe | none yet |
+| Paste a link or write one by hand (hint) | Paste a link or write one by hand | none yet |
+| Plan entry (Home choice sheet) | Plan entry | none yet |
+| Put a recipe or a note on a day (hint) | Put a recipe or a note on a day | none yet |
+| List item (Home choice sheet) | List item | none yet |
+| Add a line to the shopping list (hint) | Add a line to the shopping list | none yet |
+| Show all N tags | Show all N tags | none yet |
+| Show fewer tags | Show fewer tags | none yet |
+| No times (plan recipe picker, a recipe without times) | No times | pl |
+| No tags yet (tags empty state) | No tags yet | ta |
+| Tags are added while you edit a recipe. | Tags are added while you edit a recipe. | ta |
 
-Count: 152 rows (about 170 distinct strings counting alternates inside rows); 8 rows are new from gate-1 decisions and marked "none yet" in the spec column, the e2e suite does not match them until the redesign's tests are written. "Shortest time" appears nowhere in the e2e suite. German strings: 0. The only German text in the tests is data (recipe titles such as "Käse-Spätzle", "Äpfel im Schlafrock"), which is fixture content, not UI copy.
+Count: 152 rows before Eating Out was added (the rows above for Eating Out are 32 more, all marked "none yet") (about 170 distinct strings counting alternates inside rows); 8 rows are new from gate-1 decisions and marked "none yet" in the spec column, the e2e suite does not match them until the redesign's tests are written. "Shortest time" appears nowhere in the e2e suite. German strings: 0. The only German text in the tests is data (recipe titles such as "Käse-Spätzle", "Äpfel im Schlafrock"), which is fixture content, not UI copy.
 
 Strings in the UI that the e2e suite does not match, but which are part of this contract's behavior descriptions and should also be English: all headings, kickers and helper sentences quoted in section 4 (for example "Recipes worth keeping", "Bring a recipe home", "Write it down", "Things to buy", "Nothing to buy", "Manage tags", "Tick things off as you shop; they gather here.", "Try fewer tags or a different word.").
 
@@ -471,13 +595,13 @@ Rule: only attributes that express state that has no accessible equivalent. Ever
 | `data-hydrated` (on the document element) | The client app has booted, so event handlers and enhanced forms are live. | Pure readiness of the page's scripts; no ARIA state means "scripts attached". Tests wait on it before interacting. |
 | `data-drop-target` (on a plan slot) | During a drag, this slot is the one the dragged recipe or entry would drop into. | Transient pointer-drag state; the only ARIA drag attributes (`aria-dropeffect`, `aria-grabbed`) are deprecated and unsupported. |
 | `data-compact` (on the navigation) | The page is scrolled more than 48 px; the navigation is in its scrolled state. | Scroll-derived state of a landmark; no ARIA attribute expresses it. |
-| `data-column` (on a content column) | The edges of the page's content column, which the page header and every section heading must line up with, centred in the viewport at a bounded width. | Alignment is layout geometry; a generic container has no role or name to find it by. |
-| `data-page-header` (on the page header block) | The page's header block, which must start at the content column's left edge. | The header's position is what is measured; a generic container has no role or name, and the page `h1` may sit inside a panel that is inset on purpose. |
-| `data-section-heading` (on a section heading) | A section heading that must start at the content column's left edge. | Headings inside panels or second columns are inset on purpose and carry the same role, so only the column-level ones need marking. |
+| `data-scrolled` (on the wide top bar) | The top of the page frame has scrolled out of view; the bar shows its opaque scrolled card. | Scroll-derived state of a landmark, like `data-compact`; no ARIA attribute expresses it. |
+| `data-bar` (on a shell bar: `top`, `strip`, `phone`) | Which of the three shell bars an element is: the wide top bar, the phone strip or the phone bar (the Main navigation of the phone). | The phone and the wide posture each render a navigation named "Main"; only one is shown, and role and name cannot tell them apart. |
+| `data-pill-track` (on the pill list of the phone bar) | The list whose five pills the glide moves along, apart from the round add button beside it. | The add button sits in the same navigation as the pills; the pill list is a plain `ul` with no distinguishing name. |
 
 ## 8. Route coverage check
 
-Source: `src/routes` (excluding `/__test*` and `/__mockups*`). 12 of 12 covered.
+Source: `src/routes` (excluding `/__test*` and `/__mockups*`). 16 of 16 covered.
 
 | route | file(s) | contract section |
 |---|---|---|
@@ -490,6 +614,10 @@ Source: `src/routes` (excluding `/__test*` and `/__mockups*`). 12 of 12 covered.
 | `/recipes/tags` | `(app)/recipes/tags/+page.svelte` | 4.8 |
 | `/plan` | `(app)/plan/+page.svelte` | 4.9 |
 | `/list` | `(app)/list/+page.svelte` | 4.10 |
+| `/eating-out` | `(app)/eating-out/+page.svelte` | 4.12 |
+| `/eating-out/new` | `(app)/eating-out/new/+page.svelte` | 4.13 (form: 4.15) |
+| `/eating-out/[id]` | `(app)/eating-out/[id]/+page.svelte` | 4.14 |
+| `/eating-out/[id]/edit` | `(app)/eating-out/[id]/edit/+page.svelte` | 4.15 |
 | `POST /recipes/[id]/favourite` | `(app)/recipes/[id]/favourite/+server.ts` | 4.11, 4.5 |
 | `GET /images/[id]` | `images/[id]/+server.ts` | 4.11 |
 | `GET /healthz` | `healthz/+server.ts` | 4.11 |

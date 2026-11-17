@@ -24,6 +24,9 @@ test('Scenario: Add from plan for the shown week', async ({ page, request }) => 
 		entries: [{ date: '2026-10-22', slot: 'dinner', recipe: 0, servings: 4 }]
 	});
 	await open(page, '/list');
+	// the live region is there, empty, before the notice is written into it, so the text is announced
+	await expect(page.getByRole('status')).toHaveCount(1);
+	await expect(page.getByRole('status')).toHaveText('');
 
 	await page.getByRole('button', { name: 'Add from plan' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Add from plan' });

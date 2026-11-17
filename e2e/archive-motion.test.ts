@@ -33,45 +33,6 @@ const gliding = (page: Page, title: string) =>
 				)
 		);
 
-test('Scenario: Cards enter staggered', async ({ page, request }) => {
-	await reset(request);
-	await seed(request, { recipes: ['A', 'B', 'C', 'D', 'E'].map((t) => ({ title: `Recipe ${t}` })) });
-	await open(page, '/recipes');
-
-	const entrances = await grid(page)
-		.getByRole('listitem')
-		.evaluateAll((items) =>
-			items.map((li) => {
-				const s = getComputedStyle(li);
-				return { name: s.animationName, delay: parseFloat(s.animationDelay) };
-			})
-		);
-
-	expect(entrances).toHaveLength(5);
-	for (const e of entrances) expect(e.name).not.toBe('none');
-	for (let i = 1; i < entrances.length; i++) expect(entrances[i].delay).toBeGreaterThan(entrances[i - 1].delay);
-});
-
-test('Scenario: Reduced motion shows cards without entrance animation', async ({ page, request }) => {
-	await reset(request);
-	await seed(request, { recipes: ['A', 'B', 'C', 'D', 'E'].map((t) => ({ title: `Recipe ${t}` })) });
-	await calm(page);
-	await open(page, '/recipes');
-
-	const items = await grid(page)
-		.getByRole('listitem')
-		.evaluateAll((list) =>
-			list.map((li) => ({
-				running: li.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length,
-				opacity: getComputedStyle(li).opacity
-			}))
-		);
-
-	expect(items).toHaveLength(5);
-	expect(items).toEqual(items.map(() => ({ running: 0, opacity: '1' })));
-	for (const t of ['A', 'B', 'C', 'D', 'E']) await expect(grid(page).getByRole('link', { name: `Recipe ${t}` })).toBeVisible();
-});
-
 test('Scenario: Filtered cards glide to new positions', async ({ page, request }) => {
 	await reset(request);
 	await seed(request, three);

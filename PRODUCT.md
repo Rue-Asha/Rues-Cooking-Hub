@@ -20,7 +20,7 @@ A single-household tool rather than a service: self-hosted, no account, no ads, 
 
 ## Operating Context
 
-- Four areas: Home, Recipes (archive, import, tag manager), Plan (week Monday to Sunday with Breakfast, Lunch, Dinner, Snacks), List (one shopping list). Navigation offers the brand link, "Add recipe" and "Search recipes" (focusing the archive search) at every width.
+- Five areas: Home, Recipes (archive, import, tag manager), Plan (week Monday to Sunday with Breakfast, Lunch, Dinner, Snacks), List (one shopping list), Eating Out (food spots to try and visited ones with a score). Navigation offers the brand link, "Add recipe" and "Search recipes" (focusing the archive search) at every width.
 - Recipes arrive by importing a web page link (schema.org recipe data, with a manual fallback) or by hand with ingredient and step sections, a photo, tags, a source and Markdown notes. An unsaved new or imported recipe is kept as a local draft in the browser and restored after a reload.
 - A recipe page scales its ingredients to the servings you choose (view only, nothing stored); it shows no planned status, only "Add to plan".
 - The plan is edited by drag and drop on desktop and by a "Move to…" menu everywhere; whole weeks can be copied.

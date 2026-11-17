@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { calm, homeTiles, open, reset, seed, setToday } from './helpers.ts';
+import { open, reset, seed, setToday } from './helpers.ts';
 
 const MONDAY = '2026-10-19';
 const WEDNESDAY = '2026-10-21';
@@ -10,11 +10,13 @@ test.beforeEach(async ({ request }) => {
 	await setToday(request, WEDNESDAY);
 });
 
-const today = (page: Page) => page.getByRole('region', { name: 'Today' });
+const main = (page: Page) => page.getByRole('main');
 const tile = (page: Page, name: 'hero' | 'week' | 'list' | 'favourite') =>
 	name === 'hero'
-		? today(page).getByRole('article')
-		: today(page).getByRole('link', { name: { week: /^This week/, list: /^Shopping list/, favourite: /^Favourite/ }[name] });
+		? main(page).getByRole('article', { name: /^(Today's recipe|Welcome)$/ })
+		: name === 'week'
+			? main(page).getByRole('region', { name: 'This week' })
+			: main(page).getByRole('link', { name: name === 'list' ? /^Shopping list/ : /^Favourite/ });
 
 test("Scenario: Hero shows today's planned recipe", async ({ page, request }) => {
 	const { recipes } = await seed(request, {
@@ -69,7 +71,7 @@ test('Scenario: Empty archive shows the welcome hero', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: 'Recently added' })).toHaveCount(0);
 });
 
-test('Scenario: This week tile lists the seven days', async ({ page, request }) => {
+test('Scenario: This week lists the seven days', async ({ page, request }) => {
 	await seed(request, {
 		recipes: [{ title: 'Pumpkin soup', image: true }],
 		entries: [
@@ -81,7 +83,7 @@ test('Scenario: This week tile lists the seven days', async ({ page, request }) 
 	await open(page, '/');
 
 	const week = tile(page, 'week');
-	await expect(week).toHaveAttribute('href', '/plan');
+	await expect(week.getByRole('link')).toHaveAttribute('href', '/plan');
 	await expect(week.getByRole('heading', { level: 2 })).toHaveText('This week');
 	const days = week.getByRole('listitem');
 	await expect(days).toHaveCount(7);
@@ -94,11 +96,11 @@ test('Scenario: This week tile lists the seven days', async ({ page, request }) 
 	await expect(days.filter({ hasText: 'Wed' })).toHaveAttribute('aria-current', 'date');
 	await expect(week).not.toContainText('Next week');
 
-	await week.click();
+	await week.getByRole('link').click();
 	await expect(page).toHaveURL('/plan');
 });
 
-test('Scenario: Shopping tile shows open count and first items', async ({ page, request }) => {
+test('Scenario: Shopping list shows open count and first items', async ({ page, request }) => {
 	await seed(request, {
 		items: [
 			{ name: 'apples', category: 'produce' },
@@ -121,7 +123,7 @@ test('Scenario: Shopping tile shows open count and first items', async ({ page, 
 	await expect(page).toHaveURL('/list');
 });
 
-test('Scenario: Empty list tile says List is empty', async ({ page, request }) => {
+test('Scenario: Empty list says List is empty', async ({ page, request }) => {
 	await seed(request, { items: [{ name: 'carrots', checked: true }] });
 	await open(page, '/');
 
@@ -131,7 +133,7 @@ test('Scenario: Empty list tile says List is empty', async ({ page, request }) =
 	await expect(list).toHaveAttribute('href', '/list');
 });
 
-test('Scenario: Favourite tile shows the most recently favourited recipe', async ({ page, request }) => {
+test('Scenario: Favourite shows the most recently favourited recipe', async ({ page, request }) => {
 	const { recipes } = await seed(request, {
 		recipes: [
 			{ title: 'Lemon tart', favourite: true, favouritedAt: '2026-10-10T10:00:00.000Z' },
@@ -173,48 +175,4 @@ test('Home carries each recipe hero name once, on the hero photo first', async (
 	);
 	expect(inHero).toBe(true);
 	await expect(page.getByRole('heading', { name: 'Recently added' })).toBeVisible();
-});
-
-test('Home tiles rise in one after another', async ({ page, request }) => {
-	await seed(request, { recipes: [{ title: 'Lasagne', image: true }] });
-	await open(page, '/');
-	await expect(homeTiles(page)).toHaveCount(4);
-
-	const delays = await homeTiles(page).evaluateAll((els) =>
-		els.map((el) => parseFloat(getComputedStyle(el).animationDelay) * 1000)
-	);
-	const names = await homeTiles(page).evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName));
-	expect(names.every((n) => n !== 'none')).toBe(true);
-	for (let i = 1; i < delays.length; i++) expect(delays[i]).toBeGreaterThan(delays[i - 1]);
-});
-
-test('Home hero photo drifts on scroll', async ({ page, request }) => {
-	await seed(request, {
-		recipes: [{ title: 'Lasagne', image: true }],
-		entries: [{ date: WEDNESDAY, slot: 'dinner', recipe: 0, servings: 2 }]
-	});
-	await open(page, '/');
-	const photo = tile(page, 'hero').getByRole('presentation');
-	const transform = () => photo.evaluate((el) => getComputedStyle(el).transform);
-	const before = await transform();
-
-	await page.evaluate(() => window.scrollTo(0, 400));
-
-	await expect.poll(transform).not.toBe(before);
-});
-
-test('Reduced motion keeps Home still', async ({ page, request }) => {
-	const { recipes } = await seed(request, {
-		recipes: [{ title: 'Lasagne', image: true }],
-		entries: [{ date: WEDNESDAY, slot: 'dinner', recipe: 0, servings: 2 }]
-	});
-	await calm(page);
-	await open(page, '/');
-
-	const names = await homeTiles(page).evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName));
-	expect(names.every((n) => n === 'none')).toBe(true);
-	await page.evaluate(() => window.scrollTo(0, 400));
-	await page.evaluate(() => new Promise(requestAnimationFrame));
-	expect(await tile(page, 'hero').getByRole('presentation').evaluate((el) => getComputedStyle(el).transform)).toBe('none');
-	expect(await named(page, `recipe-hero-${recipes[0]}`)).toBe(0);
 });

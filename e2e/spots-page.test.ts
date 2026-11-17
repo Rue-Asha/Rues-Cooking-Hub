@@ -1,6 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mapsUrl } from '../src/lib/spots/format.ts';
 import { open, reset, seed } from './helpers.ts';
+
+const photo = (page: Page) => page.locator('img.stage-photo');
 
 test.beforeEach(async ({ request }) => {
 	await reset(request);
@@ -24,7 +26,7 @@ test('Scenario: Spot page shows hero, panel, rows and actions', async ({ page, r
 	const { spots } = await seed(request, { spots: [full] });
 	await open(page, `/eating-out/${spots[0]}`);
 
-	await expect(page.getByRole('presentation')).toBeVisible();
+	await expect(photo(page)).toBeVisible();
 	const panel = page.getByRole('main');
 	await expect(panel.getByRole('heading', { level: 1 })).toContainText('Café Müller');
 	await expect(panel.getByText('8.75', { exact: true })).toBeVisible();
@@ -37,8 +39,12 @@ test('Scenario: Spot page shows hero, panel, rows and actions', async ({ page, r
 	await expect(page.getByRole('link', { name: 'Open in Maps' })).toBeVisible();
 	await expect(page.getByText('Website', { exact: true })).toBeVisible();
 	await expect(page.getByRole('strong')).toHaveText('cinnamon');
-	await expect(page.getByRole('link', { name: 'Edit' })).toHaveAttribute('href', `/eating-out/${spots[0]}/edit`);
-	await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
+	await expect(panel.getByRole('button', { name: 'More spot actions' })).toBeVisible();
+	await panel.getByRole('button', { name: 'More spot actions' }).click();
+	await expect(panel.getByRole('menuitem', { name: 'Delete spot' })).toBeVisible();
+	await panel.getByRole('menuitem', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(`/eating-out/${spots[0]}/edit`);
+	await open(page, `/eating-out/${spots[0]}`);
 	await expect(page.getByRole('button', { name: 'Mark visited' })).toHaveCount(0);
 	await expect(page.getByText(/^#\d+$/)).toHaveCount(0);
 });
@@ -47,7 +53,7 @@ test('Scenario: Spot page without photo shows the placeholder hero', async ({ pa
 	const { spots } = await seed(request, { spots: [{ name: 'Bare', city: 'Köln' }] });
 	await open(page, `/eating-out/${spots[0]}`);
 
-	await expect(page.getByRole('presentation')).toHaveCount(0);
+	await expect(photo(page)).toHaveCount(0);
 	await expect(page.getByRole('img', { name: 'No photo yet' })).toBeVisible();
 });
 
@@ -90,23 +96,4 @@ test('Scenario: Spot page makes no external requests', async ({ page, request, b
 test('Scenario: Unknown spot answers 404', async ({ request }) => {
 	const res = await request.get('/eating-out/999999');
 	expect(res.status()).toBe(404);
-});
-
-test('Spot page screenshot', async ({ page, request }, info) => {
-	const { spots } = await seed(request, {
-		spots: [
-			{ ...full, image: '/mockups/spot-ramen.jpg', tags: ['Brunch', 'Coffee', 'Vegan'] },
-			{ name: 'Ramen Ichi', neighbourhood: 'Altona', city: 'Hamburg', price: 2, image: '/mockups/spot-ramen.jpg' }
-		]
-	});
-	await open(page, `/eating-out/${spots[0]}`);
-	await expect(page.getByRole('presentation')).toBeVisible();
-	await page.waitForTimeout(700);
-	await page.screenshot({ path: `test-results/shots/eating-out-spot-${info.project.name}.png`, fullPage: true });
-
-	await open(page, `/eating-out/${spots[1]}`);
-	await page.getByRole('button', { name: 'Mark visited' }).click();
-	await expect(page.getByRole('dialog', { name: 'Mark visited' })).toBeVisible();
-	await page.waitForTimeout(500);
-	await page.screenshot({ path: `test-results/shots/eating-out-spot-sheet-${info.project.name}.png` });
 });

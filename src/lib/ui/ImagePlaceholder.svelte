@@ -18,19 +18,19 @@
 		display: grid;
 		place-content: center;
 		justify-items: center;
-		gap: var(--s-2);
+		gap: var(--space-2);
 		inline-size: 100%;
 		block-size: 100%;
 		background:
-			radial-gradient(circle at 50% 42%, var(--surface) 0, transparent 60%),
-			var(--sand);
-		color: var(--ink-2);
+			radial-gradient(circle at 50% 42%, var(--surface-raised) 0, transparent 60%),
+			var(--surface-sunken);
+		color: var(--ink-secondary);
 	}
 
 	svg {
 		inline-size: min(46%, 132px);
 		fill: none;
-		stroke: var(--stone);
+		stroke: var(--ink-muted);
 		stroke-width: 1.4;
 		stroke-linecap: round;
 		stroke-linejoin: round;
@@ -47,8 +47,8 @@
 	}
 
 	span {
-		font-size: var(--t-small);
-		font-weight: 500;
+		font-size: var(--type-caption-size);
+		font-weight: var(--weight-medium);
 		letter-spacing: 0.02em;
 	}
 </style>

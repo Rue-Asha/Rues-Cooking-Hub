@@ -4,11 +4,9 @@ import { open, reset, seed, type SeedInput } from './helpers.ts';
 type Recorded = { calls: { named: number; inCard: number; inStack: number }[]; hero: string };
 
 const stack = (page: Page) => page.getByRole('region', { name: 'Featured' });
-// the cards behind the front one are aria-hidden, so the one exposed link is the front card
-const front = (page: Page) => stack(page).getByRole('link');
-const cards = (page: Page) => stack(page).getByRole('link', { includeHidden: true });
-const counter = (page: Page) => front(page).getByText(/^\d\d\/\d\d$/);
-const stage = (page: Page) => stack(page).getByRole('group', { name: 'Featured recipes' });
+// one recipe at a time: its title link is the one link the slide exposes
+const front = (page: Page) => stack(page).getByRole('heading', { level: 3 }).getByRole('link');
+const counter = (page: Page) => stack(page).getByText(/^\d\d\s*\/\s*\d\d$/);
 const grid = (page: Page) => page.getByRole('list', { name: 'Recipes' });
 
 // Recipe 1 is the oldest; createdAt follows the number
@@ -28,9 +26,8 @@ test('Scenario: Featured stack shows the seven newest', async ({ page, request }
 	await seed(request, { recipes: recipes(9) });
 	await open(page, '/recipes');
 
-	await expect(counter(page)).toHaveText('01/07');
+	await expect(counter(page)).toHaveText('01 / 07');
 	await expect(front(page)).toContainText('Recipe 9');
-	await expect(cards(page)).toHaveCount(7);
 	await expect(stack(page).getByText('Recipe 2', { exact: true })).toHaveCount(0);
 });
 
@@ -38,7 +35,7 @@ test('Scenario: Featured with fewer than seven counts what exists', async ({ pag
 	await seed(request, { recipes: recipes(3) });
 	await open(page, '/recipes');
 
-	await expect(counter(page)).toHaveText('01/03');
+	await expect(counter(page)).toHaveText('01 / 03');
 	await expect(front(page)).toContainText('Recipe 3');
 });
 
@@ -46,7 +43,7 @@ test('Scenario: Single featured recipe has no arrows', async ({ page, request })
 	await seed(request, { recipes: recipes(1) });
 	await open(page, '/recipes');
 
-	await expect(counter(page)).toHaveText('01/01');
+	await expect(counter(page)).toHaveText('01 / 01');
 	await expect(stack(page).getByRole('button', { name: 'Next recipe' })).toHaveCount(0);
 	await expect(stack(page).getByRole('button', { name: 'Previous recipe' })).toHaveCount(0);
 });
@@ -64,26 +61,44 @@ test('Scenario: Arrows and keyboard step through the stack', async ({ page, requ
 	await expect(front(page)).toContainText('Recipe 7');
 
 	await stack(page).getByRole('button', { name: 'Next recipe' }).click();
-	await expect(counter(page)).toHaveText('02/07');
+	await expect(counter(page)).toHaveText('02 / 07');
 	await expect(front(page)).toContainText('Recipe 6');
 
-	await stage(page).focus();
+	await stack(page).focus();
 	await page.keyboard.press('ArrowRight');
-	await expect(counter(page)).toHaveText('03/07');
+	await expect(counter(page)).toHaveText('03 / 07');
 	await expect(front(page)).toContainText('Recipe 5');
 
 	await page.keyboard.press('ArrowLeft');
-	await expect(counter(page)).toHaveText('02/07');
+	await expect(counter(page)).toHaveText('02 / 07');
 	await expect(front(page)).toContainText('Recipe 6');
+});
+
+test('Enter on Next recipe keeps focus on it, so pressing it again steps on', async ({ page, request }, info) => {
+	test.skip(info.project.name !== 'desktop', 'keyboard is the desktop path');
+	await seed(request, { recipes: recipes(7) });
+	await open(page, '/recipes');
+	const next = stack(page).getByRole('button', { name: 'Next recipe' });
+	await next.focus();
+
+	await page.keyboard.press('Enter');
+	await expect(counter(page)).toHaveText('02 / 07');
+	await expect(next).toBeFocused();
+	await page.keyboard.press('Enter');
+
+	await expect(counter(page)).toHaveText('03 / 07');
+	await expect(next).toBeFocused();
 });
 
 test('Scenario: Swipe steps through the stack on phone', async ({ page, request }, info) => {
 	test.skip(info.project.name !== 'phone', 'swipe is the touch path');
 	await seed(request, { recipes: recipes(7) });
 	await open(page, '/recipes');
-	await expect(counter(page)).toHaveText('01/07');
+	await expect(counter(page)).toHaveText('01 / 07');
+	// clear of the phone bar, which floats over the lower screen edge
+	await stack(page).evaluate((el) => el.scrollIntoView({ block: 'center' }));
 
-	const box = (await stage(page).boundingBox())!;
+	const box = (await stack(page).boundingBox())!;
 	const y = box.y + box.height / 2;
 	const from = box.x + box.width * 0.75;
 	const cdp = await page.context().newCDPSession(page);
@@ -93,7 +108,7 @@ test('Scenario: Swipe steps through the stack on phone', async ({ page, request 
 	for (let i = 1; i <= 8; i++) await touch('touchMove', from - i * 20);
 	await touch('touchEnd', from - 160);
 
-	await expect(counter(page)).toHaveText('02/07');
+	await expect(counter(page)).toHaveText('02 / 07');
 	await expect(front(page)).toContainText('Recipe 6');
 	await expect(page).toHaveURL('/recipes');
 });
@@ -106,9 +121,8 @@ test('Scenario: Featured stack ignores the filters', async ({ page, request }) =
 	await expect(page).toHaveURL(/tags=/);
 	await expect(grid(page).getByRole('heading', { level: 3 })).toHaveText(['Recipe 1']);
 
-	await expect(counter(page)).toHaveText('01/07');
+	await expect(counter(page)).toHaveText('01 / 07');
 	await expect(front(page)).toContainText('Recipe 9');
-	await expect(cards(page)).toHaveCount(7);
 });
 
 test('A featured card carries its photo into the recipe page', async ({ page, request }) => {
@@ -124,7 +138,7 @@ test('A featured card carries its photo into the recipe page', async ({ page, re
 			const named = [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).viewTransitionName === w.hero);
 			w.calls.push({
 				named: named.length,
-				inCard: named.filter((el) => el.closest('article')).length,
+				inCard: named.filter((el) => el.closest('ul[aria-label="Recipes"] li')).length,
 				inStack: named.filter((el) => el.closest('[aria-roledescription="carousel"]')).length
 			});
 			return start(...args);
@@ -132,7 +146,7 @@ test('A featured card carries its photo into the recipe page', async ({ page, re
 	}, name);
 	await open(page, '/recipes');
 
-	await stack(page).getByRole('link', { name: /Recipe 3/ }).click();
+	await front(page).click();
 	await expect(page).toHaveURL(`/recipes/${ids[2]}`);
 
 	expect(await page.evaluate(() => (window as unknown as Recorded).calls)).toEqual([{ named: 1, inCard: 0, inStack: 1 }]);

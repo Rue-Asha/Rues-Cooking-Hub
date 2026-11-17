@@ -54,6 +54,14 @@ describe('Scenario: Draft round-trips through storage', () => {
 
 		expect(loadDraft(storage)).toEqual({ v: 1, imported: true, form: filled });
 	});
+
+	it('keeps the host a read import came from', () => {
+		const storage = fakeStorage();
+
+		expect(saveDraft(storage, { v: 1, imported: true, host: 'example.com', form: filled })).toBe(true);
+
+		expect(loadDraft(storage)?.host).toBe('example.com');
+	});
 });
 
 describe('Scenario: Unreadable or unavailable storage yields no draft', () => {
@@ -81,12 +89,12 @@ describe('Scenario: Unreadable or unavailable storage yields no draft', () => {
 				throw new DOMException('full', 'QuotaExceededError');
 			}
 		};
-		expect(() => saveDraft(full, { v: 1, imported: false, form: filled })).not.toThrow();
+		expect(saveDraft(full, { v: 1, imported: false, form: filled })).toBe(false);
 	});
 
 	it('returns null and does not throw when the storage throws', () => {
 		expect(loadDraft(throwing)).toBeNull();
-		expect(() => saveDraft(throwing, { v: 1, imported: false, form: filled })).not.toThrow();
+		expect(saveDraft(throwing, { v: 1, imported: false, form: filled })).toBe(false);
 		expect(() => clearDraft(throwing)).not.toThrow();
 	});
 });

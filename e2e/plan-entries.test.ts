@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { entries, open, reset, seed, setToday, slot } from './helpers.ts';
+import { entries, expectNoEntries, open, reset, seed, setToday, slot } from './helpers.ts';
 
 test.beforeEach(async ({ request }) => {
 	await reset(request);
@@ -53,7 +53,7 @@ test('Scenario: Empty free text shows an error', async ({ page }) => {
 	await picker.getByRole('button', { name: 'Add to plan' }).click();
 	await expect(picker.getByText('Enter a recipe or some text')).toBeVisible();
 	await expect(picker).toBeVisible();
-	await expect(entries(page, '2026-10-23', 'dinner')).toHaveCount(0);
+	await expectNoEntries(page, '2026-10-23', 'dinner');
 });
 
 test('Scenario: Edit and delete an entry', async ({ page, request }) => {
@@ -105,4 +105,35 @@ test('Entry menu rejects servings below 1 and works by keyboard', async ({ page,
 	await page.getByLabel('Servings').fill('0');
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByText('Servings must be at least 1')).toBeVisible();
+});
+
+test('deleting the last entry of a day at the bottom of the page does not glide the week by the scroll clamp', async ({ page, request }, info) => {
+	test.skip(info.project.name !== 'phone', 'the stacked week is the phone layout');
+	const days = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25'];
+	await seed(request, { entries: days.map((date, i) => ({ date, slot: 'dinner' as const, text: `Meal ${i + 1}` })) });
+	await open(page, '/plan');
+	await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+	await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
+
+	await slot(page, '2026-10-25', 'dinner').getByRole('button', { name: 'Options for Meal 7' }).click();
+	await page.evaluate(() => {
+		const w = window as unknown as { __moved: string[] };
+		w.__moved = [];
+		const poll = () => {
+			for (const a of document.getAnimations()) {
+				const el = (a.effect as KeyframeEffect).target as HTMLElement;
+				const moves = (a.effect as KeyframeEffect).getKeyframes().some((k) => typeof k.transform === 'string' && k.transform.includes('translate'));
+				if (moves && el.matches('.entry-wrap') && !w.__moved.includes(el.textContent!.trim())) w.__moved.push(el.textContent!.trim());
+			}
+			requestAnimationFrame(poll);
+		};
+		poll();
+	});
+	// the menu opens under the phone bar at the very bottom; a click event keeps the page where it is
+	await page.getByRole('menuitem', { name: 'Delete' }).dispatchEvent('click');
+	await expect(page.getByText('Meal 7')).toHaveCount(0);
+	await page.waitForTimeout(400);
+
+	const moved = await page.evaluate(() => (window as unknown as { __moved: string[] }).__moved);
+	expect(moved.filter((t) => t.includes('Meal') && !t.includes('Meal 7'))).toEqual([]);
 });

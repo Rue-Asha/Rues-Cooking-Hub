@@ -2,17 +2,16 @@
 	import { fade } from 'svelte/transition';
 	import { COPY } from '#lib/copy.ts';
 	import { reducedMotion, rise } from '#lib/motion.ts';
-	import Button from '#lib/ui/Button.svelte';
+	import Button from '#lib/components/button/Button.svelte';
 
 	let { onkeep, ondiscard }: { onkeep: () => void; ondiscard: () => void } = $props();
 
-	let keepButton: HTMLButtonElement | undefined = $state();
 	let dialog: HTMLElement;
 
 	// focus goes in on open and returns to where it was when the dialog closes
 	$effect(() => {
 		const before = document.activeElement as HTMLElement | null;
-		keepButton?.focus();
+		dialog.querySelector('button')?.focus();
 		return () => before?.focus();
 	});
 
@@ -53,8 +52,8 @@
 		<h2 id="discard-title">{COPY.discard}</h2>
 		<p id="discard-body">What you changed on this recipe isn't saved yet.</p>
 		<div class="actions">
-			<button bind:this={keepButton} class="keep" type="button" onclick={onkeep}>Keep editing</button>
-			<Button variant="danger" arrow={false} onclick={ondiscard}>Discard</Button>
+			<Button variant="secondary" onclick={onkeep}>Keep editing</Button>
+			<Button variant="danger" onclick={ondiscard}>Discard</Button>
 		</div>
 	</div>
 </div>
@@ -63,59 +62,62 @@
 	.scrim {
 		position: fixed;
 		inset: 0;
-		z-index: 60;
-		background: var(--veil-strong);
+		z-index: var(--z-sheet);
+		background: var(--surface-tint-strong);
 	}
 
 	.wrap {
 		position: fixed;
 		inset: 0;
-		z-index: 61;
+		z-index: var(--z-sheet);
 		display: grid;
-		place-items: center;
-		padding: var(--s-4);
+		place-items: end center;
 		pointer-events: none;
 	}
 
 	.dialog {
 		pointer-events: auto;
-		inline-size: min(100%, 420px);
+		inline-size: 100%;
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-3);
-		padding: var(--s-6);
-		border-radius: var(--r-panel);
-		background: var(--surface);
-		box-shadow: var(--shadow-lift);
+		gap: var(--space-3);
+		padding: var(--space-5) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
+		border-radius: var(--radius-card) var(--radius-card) 0 0;
+		/* reading sits on solid: the dialog is opaque, not glass (--surface-card lets a charcoal card show through) */
+		background: var(--surface-raised);
+		box-shadow: var(--elevation-card);
+		color: var(--ink);
 	}
 
 	h2 {
-		font-size: var(--t-display-3);
+		font-size: var(--type-display-s-size);
+		line-height: var(--type-display-s-line);
+		letter-spacing: var(--type-display-s-tracking);
 	}
 
 	p {
-		color: var(--ink-2);
+		color: var(--ink-secondary);
+		font-size: var(--type-body-size);
+		line-height: var(--type-body-line);
 	}
 
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: flex-end;
-		gap: var(--s-2);
-		margin-block-start: var(--s-3);
+		gap: var(--space-2);
+		margin-block-start: var(--space-3);
 	}
 
-	.keep {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-block-size: 48px;
-		padding: 0 var(--s-5);
-		border-radius: var(--r-pill);
-		border: 1px solid var(--olive);
-		background: var(--olive);
-		color: var(--white);
-		font-size: 15px;
-		font-weight: 500;
+	@media (min-width: 768px) {
+		.wrap {
+			place-items: center;
+		}
+
+		.dialog {
+			inline-size: min(var(--measure) * 0.75, 100% - 2 * var(--space-8));
+			padding: var(--space-6);
+			border-radius: var(--radius-card);
+		}
 	}
 </style>

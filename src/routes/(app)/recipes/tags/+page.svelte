@@ -1,19 +1,22 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
-	import { untrack } from 'svelte';
-	import { flip } from 'svelte/animate';
-	import { flipOptions, rise, slideOut, stagger } from '#lib/motion.ts';
+	import { flipOnPage, slideOut } from '#lib/motion.ts';
 	import Sheet from '#lib/plan/Sheet.svelte';
 	import type { TagWithCount } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
+	import Button from '#lib/components/button/Button.svelte';
+	import EmptyState from '#lib/components/empty-state/EmptyState.svelte';
+	import Field from '#lib/components/field/Field.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
-	import IconButton from '#lib/ui/IconButton.svelte';
-	import Kicker from '#lib/ui/Kicker.svelte';
+	import Status from '#lib/ui/Status.svelte';
 
 	let { data } = $props();
 
+	// the page settles in on a full page load only
+	const settle = typeof document === 'undefined' || !document.documentElement.hasAttribute('data-hydrated');
+
 	const recipesLabel = (n: number) => (n === 1 ? '1 recipe' : `${n} recipes`);
-	const introDelay = new Map(untrack(() => data.tags).map((t, i) => [t.id, stagger(i)]));
+	const count = (n: number, noun: string) => (n === 1 ? `1 ${noun}` : `${n} ${noun}s`);
+	const used = $derived(data.tags.filter((t) => t.count > 0).length);
 
 	let editing = $state<number | null>(null);
 	let error = $state<string | null>(null);
@@ -29,9 +32,11 @@
 		error = null;
 	}
 
-	function focus(node: HTMLInputElement) {
-		node.focus();
-		node.select();
+	// the field takes focus and its name is selected, so typing replaces it
+	function focus(node: HTMLElement) {
+		const input = node.querySelector('input');
+		input?.focus();
+		input?.select();
 	}
 
 	const rename: SubmitFunction = () => {
@@ -73,290 +78,169 @@
 	<title>Tags · Rues Cooking Hub</title>
 </svelte:head>
 
-<div class="column page" data-column>
-	<header class="head">
-		<div data-page-header>
-			<Kicker parts={['Archive', data.tags.length === 1 ? '1 tag' : `${data.tags.length} tags`]} />
-			<h1>Manage <em>tags</em></h1>
-			<p class="sub">Rename a tag onto one that already exists and the two become one. New tags are added while editing a recipe.</p>
-		</div>
-		<a class="back" href="/recipes"><Icon name="arrow-left" size={16} /> All recipes</a>
-	</header>
+<header class="screen-head">
+	<div class="screen-lead">
+		<ul class="kicker"><li>Archive</li><li>{count(data.tags.length, 'tag')}</li></ul>
+		<h1>Manage <em class="accent-word">tags</em></h1>
+		<p class="lede">Rename a tag onto one that already exists and the two become one. New tags are added while editing a recipe.</p>
+		{#if data.tags.length > 0}<Button href="/recipes">All recipes</Button>{/if}
+	</div>
+	{#if data.tags.length > 0}
+		<ul class="screen-facts" data-surface="inverse" aria-label="Tag totals">
+			<li class="facts-caption" aria-hidden="true">Your tags</li>
+			<li><span class="n">{data.tags.length.toLocaleString('en-GB')}</span>{data.tags.length === 1 ? 'Tag' : 'Tags'}</li>
+			<li><span class="n">{used.toLocaleString('en-GB')}</span>In use</li>
+			<li><span class="n">{(data.tags.length - used).toLocaleString('en-GB')}</span>Unused</li>
+		</ul>
+	{/if}
+</header>
 
-	<p class="note" role="status">
-		{#key note}{#if note}<span in:rise={{ y: 6 }}><Icon name="check" size={16} /> {note}</span>{/if}{/key}
-	</p>
+<div class="screen-body" data-settle={settle ? '' : undefined}>
+	{#if note}
+		<div class="note"><Status>{note}</Status></div>
+	{/if}
 
-	<ul class="tags" aria-label="Tags">
-		{#each data.tags as tag (tag.id)}
-			<li
-				style:--delay="{introDelay.get(tag.id) ?? 0}ms"
-				class:editing={editing === tag.id}
-				animate:flip={flipOptions()}
-				out:slideOut
-				onoutrostart={leaving}
-			>
-				{#if editing === tag.id}
-					<form
-						class="edit"
-						method="POST"
-						action="?/rename"
-						use:enhance={rename}
-						in:rise={{ y: 6 }}
+	{#if data.tags.length === 0}
+		<EmptyState title="No tags yet" body="Tags are added while you edit a recipe.">
+			{#snippet action()}<Button href="/recipes">All recipes</Button>{/snippet}
+		</EmptyState>
+	{:else}
+		<section class="card" data-surface="solid" aria-labelledby="all-tags">
+			<div class="card-head">
+				<h2 id="all-tags">All tags</h2>
+				<span class="card-note">{count(data.tags.length, 'tag')}</span>
+			</div>
+			<ul class="list" aria-label="Tags">
+				{#each data.tags as tag (tag.id)}
+					<li
+						class="row"
+						class:open={editing === tag.id}
+						animate:flipOnPage
+						out:slideOut
+						onoutrostart={leaving}
 					>
-						<input type="hidden" name="id" value={tag.id} />
-						<input
-							class="field"
-							name="name"
-							value={tag.name}
-							aria-label="New name for {tag.name}"
-							aria-invalid={error ? 'true' : undefined}
-							autocomplete="off"
-							onkeydown={(e) => e.key === 'Escape' && (editing = null)}
-							use:focus
-						/>
-						<Button type="submit" variant="olive" arrow={false} icon="check" disabled={busy}>Save</Button>
-						<Button variant="ghost" arrow={false} onclick={() => (editing = null)}>Cancel</Button>
-						{#if error}<p class="error" in:rise={{ y: 4 }}>{error}</p>{/if}
-					</form>
-				{:else}
-					<div class="show" in:rise={{ y: 6 }}>
-						<span class="name">{tag.name}</span>
-						<span class="count tnum" class:unused={tag.count === 0}>
-							{#key tag.count}<span in:rise={{ y: 6 }}>{recipesLabel(tag.count)}</span>{/key}
-						</span>
-						<span class="actions">
-							<IconButton icon="edit" variant="plain" label="Rename {tag.name}" onclick={() => edit(tag.id)} />
-							<IconButton class="del" icon="trash" variant="plain" label="Delete {tag.name}" onclick={() => askDelete(tag)} />
-						</span>
-					</div>
-				{/if}
-			</li>
-		{/each}
-	</ul>
+						<div class="who">
+							<span class="name">{tag.name}</span>
+							<span class="count" class:unused={tag.count === 0}>{recipesLabel(tag.count)}</span>
+						</div>
+						{#if editing === tag.id}
+							<form class="rename" method="POST" action="?/rename" use:enhance={rename} use:focus>
+								<input type="hidden" name="id" value={tag.id} />
+								<Field
+									label="New name for {tag.name}"
+									hideLabel
+									name="name"
+									value={tag.name}
+									error={error ?? undefined}
+									autocomplete="off"
+									onkeydown={(e: KeyboardEvent) => e.key === 'Escape' && (editing = null)}
+								/>
+								<div class="acts">
+									<Button variant="primary" size="s" type="submit" disabled={busy}>Save</Button>
+									<Button variant="quiet" size="s" onclick={() => (editing = null)}>Cancel</Button>
+								</div>
+							</form>
+						{:else}
+							<div class="acts">
+								<Button variant="quiet" icon label="Rename {tag.name}" onclick={() => edit(tag.id)}><Icon name="edit" size={18} /></Button>
+								<Button variant="quiet" icon label="Delete {tag.name}" class="delete" onclick={() => askDelete(tag)}><Icon name="trash" size={18} /></Button>
+							</div>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 </div>
 
 <Sheet open={confirming} kicker="Delete tag" title="Delete tag “{target?.name}”?" onclose={() => (confirming = false)}>
-	<form class="confirm" method="POST" action="?/delete" use:enhance={remove}>
+	<form id="delete-tag" class="confirm" method="POST" action="?/delete" use:enhance={remove}>
 		<input type="hidden" name="id" value={target?.id} />
 		{#if target && target.count > 0}
 			<p class="usage">It's used by {recipesLabel(target.count)}.</p>
 		{/if}
-		<div class="foot">
-			<Button variant="secondary" arrow={false} onclick={() => (confirming = false)}>Cancel</Button>
-			<Button type="submit" variant="danger" icon="trash" disabled={busy}>Delete</Button>
-		</div>
 	</form>
+	{#snippet actions()}
+		<Button onclick={() => (confirming = false)}>Cancel</Button>
+		<Button variant="danger" type="submit" form="delete-tag" disabled={busy}>Delete</Button>
+	{/snippet}
 </Sheet>
 
 <style>
-	.page {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-6);
-	}
-
-	.head {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: var(--s-5);
-	}
-
-	h1 {
-		margin-block-start: var(--s-3);
-	}
-
-	h1 em {
-		color: var(--brick);
-	}
-
-	.sub {
-		max-inline-size: 52ch;
-		margin-block-start: var(--s-3);
-		color: var(--ink-2);
-	}
-
-	.back {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-		flex: none;
-		min-block-size: 44px;
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--ink-2);
-	}
-
 	.note {
-		min-block-size: 24px;
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--olive);
+		margin-block-end: var(--space-3);
 	}
-
-	.note span {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	.tags {
+	.card {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--s-3) var(--s-4);
-	}
-
-	.tags > li {
-		min-block-size: 64px;
-		padding: 0 var(--s-2) 0 var(--s-5);
-		border-radius: var(--r-md);
-		background: var(--surface);
-		box-shadow: var(--shadow-card);
-		animation: rise-in var(--d-slow) var(--ease-out) var(--delay, 0ms) backwards;
-		transition: box-shadow var(--d-base) var(--ease-out);
-	}
-
-	.tags > li.editing {
-		box-shadow:
-			0 0 0 2px var(--olive),
-			var(--shadow-card);
-	}
-
-	@keyframes rise-in {
-		from {
-			opacity: 0;
-			transform: translateY(16px);
-		}
-	}
-
-	.show,
-	.edit {
-		display: flex;
-		align-items: center;
-		gap: var(--s-3);
-		min-block-size: 64px;
-	}
-
-	.edit {
-		flex-wrap: wrap;
-		padding-block: var(--s-2);
-	}
-
-	.name {
-		flex: 1;
+		gap: var(--space-4);
+		align-content: start;
+		padding: var(--space-5);
 		min-inline-size: 0;
-		font-family: var(--font-display);
-		font-size: 22px;
-		font-weight: 400;
+	}
+	.list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+		gap: var(--space-2);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: var(--space-2) var(--space-3);
+		min-block-size: var(--space-14);
+		min-inline-size: 0;
+		padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+		border-radius: var(--radius-panel);
+		background: var(--surface-sunken);
+	}
+	.row.open {
+		grid-template-columns: minmax(0, 1fr);
+		padding-block: var(--space-3);
+		padding-inline: var(--space-4);
+		background: var(--surface-raised);
+		box-shadow: var(--ring-control);
+	}
+	.who {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: var(--space-0-5) var(--space-3);
+		min-inline-size: 0;
+	}
+	.name {
+		min-inline-size: 0;
+		font-size: var(--type-title-size);
+		line-height: var(--type-title-line);
+		font-weight: var(--type-title-weight);
 		overflow-wrap: anywhere;
 	}
-
 	.count {
-		display: inline-grid;
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--ink-2);
-		white-space: nowrap;
+		font-size: var(--type-caption-size);
+		color: var(--ink-secondary);
+		font-variant-numeric: var(--numeric-figures);
 	}
-
-	.count > span {
-		grid-area: 1 / 1;
-	}
-
-	.unused {
-		color: var(--stone);
-	}
-
-	.actions {
+	.acts {
 		display: flex;
+		gap: var(--space-1);
 	}
-
-	.actions :global(.del) {
-		color: var(--brick);
+	.row :global(.delete) {
+		color: var(--danger);
 	}
-
-	.field {
-		flex: 1;
-		min-inline-size: 10ch;
-		min-block-size: 44px;
-		padding: 0 var(--s-4);
-		border: 1px solid var(--line);
-		border-radius: var(--r-pill);
-		background: var(--ground);
-		font-size: 16px;
-		color: var(--ink);
+	.rename {
+		display: grid;
+		gap: var(--space-2);
+		min-inline-size: 0;
 	}
-
-	.field {
-		transition: border-color var(--d-fast) var(--ease-out);
-	}
-
-	.field:focus {
-		outline: none;
-		border-color: var(--olive);
-	}
-
-	.error {
-		flex: 0 0 100%;
-		padding-inline-start: var(--s-4);
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--brick);
-	}
-
-	.confirm {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-5);
-	}
-
 	.usage {
-		padding: var(--s-3) var(--s-4);
-		border-radius: var(--r-sm);
-		background: var(--brick-soft);
-		color: var(--brick);
-		font-size: 14px;
-		font-weight: 500;
+		color: var(--ink-secondary);
 	}
-
-	.foot {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--s-3);
-		padding-block-start: var(--s-3);
-		border-block-start: 1px solid var(--line);
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.tags > li {
-			animation: none;
-		}
-	}
-
-	@media (max-width: 1023px) {
-		.head {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: var(--s-2);
-		}
-
-		.back {
-			order: -1;
-			margin-inline-start: -4px;
-		}
-
-		.tags {
-			grid-template-columns: 1fr;
-		}
-
-		.tags > li {
-			padding-inline-start: var(--s-4);
-		}
-
-		.name {
-			font-size: 19px;
+	@media (min-width: 768px) {
+		.rename {
+			grid-template-columns: minmax(0, 1fr) auto;
+			align-items: start;
 		}
 	}
 </style>

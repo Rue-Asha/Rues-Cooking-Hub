@@ -1,59 +1,74 @@
 <script lang="ts">
-	import { beforeNavigate, goto } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import type { Snapshot } from './$types';
-	import { untrack } from 'svelte';
-	import { flip } from 'svelte/animate';
-	import { cubicOut } from 'svelte/easing';
-	import type { TransitionConfig } from 'svelte/transition';
+	import { tick } from 'svelte';
+	import Button from '#lib/components/button/Button.svelte';
+	import EmptyState from '#lib/components/empty-state/EmptyState.svelte';
 	import { COPY } from '#lib/copy.ts';
-	import { flipOptions, reducedMotion, rise, stagger } from '#lib/motion.ts';
+	import { flipOnPage } from '#lib/motion.ts';
 	import FeaturedStack from '#lib/recipes/FeaturedStack.svelte';
 	import FilterBar from '#lib/recipes/FilterBar.svelte';
 	import { hasFilters, toSearch, type ParsedQuery } from '#lib/recipes/query.ts';
 	import RecipeCard from '#lib/recipes/RecipeCard.svelte';
-	import Button from '#lib/ui/Button.svelte';
-	import Icon from '#lib/ui/Icon.svelte';
-	import IconButton from '#lib/ui/IconButton.svelte';
-	import ImagePlaceholder from '#lib/ui/ImagePlaceholder.svelte';
-	import Kicker from '#lib/ui/Kicker.svelte';
+	import { useStage } from '#lib/shell/stage.svelte.ts';
 
 	let { data } = $props();
 
+	const PAGE = 24;
+
 	let featuredIndex = $state(0);
+	// the featured recipe's photo is the stage, as signed; without one, the first shown recipe that has a photo
+	useStage(() => {
+		const id = data.featured[featuredIndex]?.imageId ?? data.featured.find((r) => r.imageId != null)?.imageId;
+		return id == null ? null : `/images/${id}`;
+	});
 	let handoff = $state<number | null>(null);
 
-	// back from a recipe opened in the stack: the same card is in front and takes the hero back
-	export const snapshot: Snapshot<{ index: number; handoff: number | null }> = {
-		capture: () => ({ index: featuredIndex, handoff }),
-		restore: (s) => ({ index: featuredIndex, handoff } = s)
+	// Back from a recipe: the same recipe is in front of the stack and takes the hero back, and the list shows as many
+	// rows as before. SvelteKit scrolls before it restores, so the scroll is taken again once the rows are back.
+	export const snapshot: Snapshot<{ index: number; handoff: number | null; paged: { key: string; shown: number }; y: number }> = {
+		capture: () => ({ index: featuredIndex, handoff, paged, y: window.scrollY }),
+		restore: async (s) => {
+			({ index: featuredIndex, handoff } = s);
+			// a reload or a fresh visit starts the list at PAGE again; only Back keeps the rows
+			if (settle) return;
+			paged = s.paged;
+			await tick();
+			if (s.paged.shown > PAGE) scrollTo({ top: s.y, behavior: 'instant' });
+		}
 	};
 
-	const recipesLabel = (n: number) => (n === 1 ? '1 recipe' : `${n} recipes`);
-
+	const plural = (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'recipe' : 'recipes'}`;
 	const filtered = $derived(hasFilters(data.query));
 	const selected = $derived(data.tags.filter((t) => data.query.tagIds.includes(t.id)).map((t) => t.name));
+	const where = $derived(
+		[
+			selected.length ? `in ${selected.join(', ')}` : data.query.favouritesOnly ? 'in Favourites' : '',
+			data.query.q.trim() ? `for “${data.query.q.trim()}”` : ''
+		]
+			.filter(Boolean)
+			.join(' ')
+	);
 
-	// The first cards rise in through CSS, so the entrance plays before hydration; cards that arrive later use rise().
-	let intro = $state(true);
-	beforeNavigate(() => (intro = false));
-	// fixed per card: a delay that changed on reorder would push a finished entrance back into its delay
-	const introDelay = new Map(untrack(() => data.recipes).map((r, i) => [r.id, stagger(i)]));
+	// the page settles in on a full page load only: the server-rendered page, never one mounted by in-app navigation
+	const settle = typeof document === 'undefined' || !document.documentElement.hasAttribute('data-hydrated');
 
-	let arrivals = 0;
-	function arrival() {
-		if (arrivals++ === 0) queueMicrotask(() => (arrivals = 0));
-		return { delay: 160 + stagger(arrivals - 1), y: 20 };
-	}
+	// how many rows are shown; any other filter, search or sort starts at PAGE again
+	const queryKey = $derived(toSearch(data.query));
+	let paged = $state({ key: '', shown: PAGE });
+	// forget the paging as soon as the query changes, so coming back to an earlier query starts at PAGE as well
+	$effect.pre(() => {
+		if (paged.key !== queryKey) paged = { key: queryKey, shown: PAGE };
+	});
+	const limit = $derived(paged.key === queryKey ? paged.shown : PAGE);
+	const rows = $derived(data.recipes.slice(0, limit));
+	let listEl = $state<HTMLUListElement>();
 
-	// Svelte pins a leaving card with an inline translate before this runs; keep it or the card jumps to the grid's corner
-	function leave(node: Element): TransitionConfig {
-		if (reducedMotion()) return { duration: 0 };
-		const pinned = (node as HTMLElement).style.transform;
-		return {
-			duration: 220,
-			easing: cubicOut,
-			css: (t) => `transform: ${pinned} scale(${(0.92 + 0.08 * t).toFixed(3)}); opacity: ${t}`
-		};
+	async function more() {
+		const before = rows.length;
+		paged = { key: queryKey, shown: limit + PAGE };
+		await tick();
+		listEl?.querySelectorAll('li')[before]?.querySelector('a')?.focus();
 	}
 
 	function navigate(next: ParsedQuery, replace = false) {
@@ -69,304 +84,123 @@
 	<title>Recipes · Rues Cooking Hub</title>
 </svelte:head>
 
-<div class="column page" data-column>
-	<header class="head">
-		<div data-page-header>
-			<Kicker parts={data.total > 0 ? ['Archive', recipesLabel(data.total)] : ['Archive']} />
-			<h1>Recipes worth <em>keeping</em></h1>
+<header class="screen-head">
+	<div class="screen-lead">
+		<ul class="kicker">
+			<li>Archive</li>
+			{#if data.total > 0}<li>{plural(data.total)}</li>{/if}
+		</ul>
+		<h1>Recipes worth <em class="accent-word">keeping</em></h1>
+		<p class="lede">Search by name, ingredient or tag, or open one of the newest.</p>
+		<div class="lead-actions">
+			<Button variant="primary" arrow href="/recipes/new">Add recipe</Button>
+			<Button href="/recipes/tags">Manage tags</Button>
 		</div>
-		<a class="tags-link wide" href="/recipes/tags"><Icon name="edit" size={16} /> Manage tags</a>
-		<IconButton class="add" variant="dark" icon="plus" label="Add recipe" href="/recipes/new" />
-	</header>
+	</div>
+	{#if data.total > 0}
+		<ul class="screen-facts" data-surface="inverse" aria-label="Your archive">
+			<li class="facts-caption" aria-hidden="true">Whole archive</li>
+			<li><span class="n">{data.total.toLocaleString('en-GB')}</span>{data.total === 1 ? 'Recipe' : 'Recipes'}</li>
+			<li><span class="n">{data.tags.length.toLocaleString('en-GB')}</span>{data.tags.length === 1 ? 'Tag' : 'Tags'}</li>
+		</ul>
+	{/if}
+</header>
 
+<div class="screen-body" data-settle={settle ? '' : undefined}>
 	{#if data.total === 0}
-		<section class="empty" aria-labelledby="empty-title">
-			<div class="empty-text">
-				<h2 id="empty-title" data-section-heading>Start your archive</h2>
-				<p>Import a recipe from any web page, or write down one you know by heart.</p>
-				<Button href="/recipes/new">Add your first recipe</Button>
-			</div>
-			<div class="empty-art"><ImagePlaceholder size="hero" label="Your first recipe goes here" /></div>
-		</section>
+		<EmptyState title="Start your archive" body="Import a recipe from any web page, or write down one you know by heart.">
+			{#snippet action()}<Button variant="primary" arrow href="/recipes/new">Add your first recipe</Button>{/snippet}
+		</EmptyState>
 	{:else}
 		{#if data.featured.length > 0}
 			<FeaturedStack recipes={data.featured} bind:index={featuredIndex} bind:handoff />
 		{/if}
-		<section class="archive" aria-labelledby="all-title">
-			<div class="section-head">
-				<h2 id="all-title" data-section-heading>All recipes</h2>
-				<a class="tags-link narrow" href="/recipes/tags"><Icon name="edit" size={16} /> Manage tags</a>
+
+		<section class="card all" data-surface="solid" aria-labelledby="all-title">
+			<div class="card-head">
+				<h2 id="all-title">All recipes</h2>
+				<span class="card-note"><span role="status">{plural(data.recipes.length)}</span>{where ? ` ${where}` : ''}</span>
 			</div>
 
 			<FilterBar tags={data.tags} query={data.query} onquery={navigate} />
 
-			<div class="count-row">
-				<p class="count" role="status">
-					{#key data.recipes.length}<span class="n" in:rise={{ y: 8 }}>{data.recipes.length}</span>{/key}
-					{data.recipes.length === 1 ? 'recipe' : 'recipes'}
-				</p>
-				{#if selected.length > 0}<p class="context"><span>in</span> {selected.join(', ')}</p>{/if}
-				{#if data.query.q.trim()}<p class="context"><span>for</span> “{data.query.q.trim()}”</p>{/if}
-				{#if filtered && data.recipes.length > 0}
-					<button type="button" class="clear" onclick={clear}>Clear filters</button>
-				{/if}
-			</div>
-
-			{#if data.recipes.length === 0}
-				<div class="no-match" in:rise={{ delay: 120 }}>
-					<p class="no-match-title">{COPY.noMatch}</p>
-					<p>Try fewer tags or a different word.</p>
-					<Button variant="secondary" onclick={clear}>Clear filters</Button>
-				</div>
+			{#if filtered && data.recipes.length > 0}
+				<div class="clear"><Button variant="quiet" size="s" onclick={clear}>Clear filters</Button></div>
 			{/if}
 
-			<ul class="grid" class:intro aria-label="Recipes">
-				{#each data.recipes as recipe (recipe.id)}
-					<li
-						class:handoff={handoff === recipe.id}
-						style:--delay="{introDelay.get(recipe.id) ?? 0}ms"
-						animate:flip={flipOptions()}
-						in:rise={arrival()}
-						out:leave
-					>
-						<RecipeCard {recipe} />
-					</li>
-				{/each}
-			</ul>
+			{#if data.recipes.length === 0}
+				<div class="none">
+					<h3>{COPY.noMatch}</h3>
+					<p>Try fewer tags or a different word.</p>
+					<Button onclick={clear}>Clear filters</Button>
+				</div>
+			{:else}
+				<ul class="list" aria-label="Recipes" bind:this={listEl}>
+					{#each rows as recipe (recipe.id)}
+						<li animate:flipOnPage>
+							<RecipeCard {recipe} named={handoff !== recipe.id} />
+						</li>
+					{/each}
+				</ul>
+				{#if data.recipes.length > rows.length}
+					<div class="paging">
+						<span class="card-note">Showing {rows.length.toLocaleString('en-GB')} of {data.recipes.length.toLocaleString('en-GB')}</span>
+						<Button onclick={more}>Show {Math.min(PAGE, data.recipes.length - rows.length)} more</Button>
+					</div>
+				{/if}
+			{/if}
 		</section>
 	{/if}
 </div>
 
 <style>
-	.page {
+	.lead-actions {
 		display: flex;
-		flex-direction: column;
-		gap: var(--s-8);
-	}
-
-	.head {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: var(--s-5);
-	}
-
-	h1 {
-		margin-block-start: var(--s-3);
-	}
-
-	h1 em {
-		color: var(--brick);
-	}
-
-	.head :global(.add) {
-		display: none;
-	}
-
-	.tags-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-		min-block-size: 44px;
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--ink-2);
-		transition: color var(--d-fast) var(--ease-out);
-	}
-
-	.tags-link:hover {
-		color: var(--ink);
-	}
-
-	.tags-link.narrow {
-		display: none;
-	}
-
-	.section-head {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: var(--s-4);
-	}
-
-	.archive {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-4);
-	}
-
-	.count-row {
-		display: flex;
-		align-items: center;
 		flex-wrap: wrap;
-		gap: 0 6px;
-		min-block-size: 44px;
-		font-size: 14px;
+		gap: var(--space-2);
+		margin-block-start: var(--space-1);
 	}
-
-	.count {
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
+	.all {
+		display: grid;
+		gap: var(--space-4);
+		padding: var(--space-5);
+		min-inline-size: 0;
 	}
-
-	.context {
-		font-weight: 600;
+	.list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+		gap: var(--space-2);
+		margin: 0;
+		padding: 0;
+		list-style: none;
 	}
-
-	.context span {
-		font-weight: 400;
-		color: var(--ink-2);
+	.list > li {
+		min-inline-size: 0;
 	}
-
 	.clear {
-		min-block-size: 44px;
-		margin-inline-start: var(--s-2);
-		padding: 0 4px;
-		border: 0;
-		background: none;
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--brick);
-		text-decoration: underline;
-		text-underline-offset: 3px;
+		justify-self: start;
 	}
-
-	.no-match {
+	.paging {
 		display: flex;
-		flex-direction: column;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--s-2);
-		padding: var(--s-9) var(--s-5);
-		border-radius: var(--r-panel);
-		border: 1px dashed var(--line);
-		text-align: center;
-		color: var(--ink-2);
+		justify-content: space-between;
+		gap: var(--space-3);
 	}
-
-	.no-match-title {
-		font-family: var(--font-display);
-		font-size: var(--t-display-3);
-		font-weight: 300;
-		color: var(--ink);
-	}
-
-	.no-match :global(.btn) {
-		margin-block-start: var(--s-4);
-	}
-
-	.grid {
-		position: relative;
+	.none {
 		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: var(--s-5) var(--s-4);
+		gap: var(--space-2);
+		justify-items: start;
+		padding: var(--space-4);
+		border-radius: var(--radius-panel);
+		background: var(--surface-sunken);
 	}
-
-	.grid > li {
-		display: flex;
-		flex-direction: column;
+	.none h3 {
+		font-size: var(--type-display-s-size);
+		line-height: var(--type-display-s-line);
+		letter-spacing: var(--type-display-s-tracking);
 	}
-
-	.grid > li > :global(.card) {
-		flex: 1;
-	}
-
-	.grid > li.handoff :global(.media) {
-		view-transition-name: none;
-	}
-
-	.grid.intro > li,
-	.empty > * {
-		animation: rise-in var(--d-slow) var(--ease-out) var(--delay, 0ms) backwards;
-	}
-
-	.empty-art {
-		--delay: 90ms;
-	}
-
-	@keyframes rise-in {
-		from {
-			opacity: 0;
-			transform: translateY(16px);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.grid.intro > li,
-		.empty > * {
-			animation: none;
-		}
-	}
-
-	.n {
-		display: inline-block;
-	}
-
-	.empty {
-		display: grid;
-		grid-template-columns: 5fr 7fr;
-		align-items: center;
-		gap: var(--s-8);
-	}
-
-	.empty-text {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--s-4);
-	}
-
-	.empty-text h2 {
-		font-size: var(--t-display-2);
-	}
-
-	.empty-text p {
-		max-inline-size: 36ch;
-		margin-block-end: var(--s-3);
-		color: var(--ink-2);
-	}
-
-	.empty-art {
-		aspect-ratio: 16 / 10;
-		border-radius: var(--r-frame);
-		overflow: hidden;
-		box-shadow: var(--shadow-card);
-	}
-
-	@media (max-width: 1023px) {
-		.page {
-			gap: var(--s-7);
-		}
-
-		.head {
-			align-items: flex-start;
-		}
-
-		.head :global(.add) {
-			display: inline-grid;
-		}
-
-		.tags-link.wide {
-			display: none;
-		}
-
-		.tags-link.narrow {
-			display: inline-flex;
-		}
-
-		.grid {
-			grid-template-columns: 1fr 1fr;
-			gap: var(--s-3);
-		}
-
-		.empty {
-			grid-template-columns: 1fr;
-			gap: var(--s-6);
-		}
-
-		.empty-art {
-			order: -1;
-			aspect-ratio: 4 / 3;
-			border-radius: var(--r-panel);
-		}
+	.none p {
+		color: var(--ink-secondary);
 	}
 </style>

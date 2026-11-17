@@ -1,20 +1,21 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
+	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
-	import { flip } from 'svelte/animate';
-	import { cubicInOut, cubicOut } from 'svelte/easing';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import type { TransitionConfig } from 'svelte/transition';
 	import AddFromPlan from '#lib/list/AddFromPlan.svelte';
 	import CategoryMenu from '#lib/list/CategoryMenu.svelte';
 	import Item from '#lib/list/Item.svelte';
-	import { flipOptions, reducedMotion, rise, stagger } from '#lib/motion.ts';
+	import { arrive as settleIn, easeOut, flipOnPage, reducedMotion, rise, stagger } from '#lib/motion.ts';
 	import { nameKey } from '#lib/shopping/aggregate.ts';
 	import { CATEGORIES, type Category, type Id, type ShoppingItem } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
+	import Button from '#lib/components/button/Button.svelte';
+	import Field from '#lib/components/field/Field.svelte';
+	import { registerContextAdd, takeAddFlag } from '#lib/shell/context-add.svelte.ts';
 	import Icon from '#lib/ui/Icon.svelte';
-	import Kicker from '#lib/ui/Kicker.svelte';
+	import Status from '#lib/ui/Status.svelte';
 
 	let { data } = $props();
 
@@ -76,14 +77,19 @@
 	let categoryForm: HTMLFormElement;
 	let move = $state<{ id: Id; category: Category } | null>(null);
 	let editError = $state<{ id: Id; message: string } | null>(null);
+	const itemsText = (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'item' : 'items'}`;
 
 	// no entrance for what the page renders on arrival; the categories rise in through CSS instead
 	let live = false;
 	let leavingPage = false;
-	let intro = $state(true);
+	// the page settles in on a full page load only
+	const settle = typeof document === 'undefined' || !document.documentElement.hasAttribute('data-hydrated');
+	const focusAdd = () => document.getElementById('add-item')?.focus();
+	// the "+" focuses the field inside its tap so the phone keyboard opens
+	$effect(() => registerContextAdd(focusAdd));
 	onMount(() => {
+		if (takeAddFlag(new URL(page.url.href))) focusAdd();
 		setTimeout(() => (live = true));
-		setTimeout(() => (intro = false), 1200);
 	});
 	beforeNavigate(() => (leavingPage = true));
 
@@ -91,7 +97,7 @@
 	function arrive(node: Element): TransitionConfig {
 		if (!live || leavingPage) return { duration: 0 };
 		if (arrivals++ === 0) queueMicrotask(() => (arrivals = 0));
-		return rise(node, { delay: 80 + stagger(arrivals - 1), y: 14 });
+		return settleIn(node, { delay: stagger(arrivals - 1) });
 	}
 
 	let leaves = 0;
@@ -102,9 +108,9 @@
 		const pinned = (node as HTMLElement).style.transform;
 		return {
 			delay: stagger(leaves - 1),
-			duration: 260,
-			easing: cubicOut,
-			css: (t, u) => `transform: ${pinned} translateX(${(u * 18).toFixed(2)}px); opacity: ${t}`
+			duration: 160,
+			easing: easeOut,
+			css: (t, u) => `transform: ${pinned} translateX(${(u * 12).toFixed(2)}px); opacity: ${t}`
 		};
 	}
 
@@ -112,6 +118,8 @@
 	// translates: rows in Checked are narrower, and crossfade's scale would squeeze the text on the way.
 	const sending = new Map<Id, Element>();
 	const receiving = new Map<Id, Element>();
+	// the whole flight, whatever the distance: one tunable, on --motion-glide
+	const FLIGHT_MS = 260;
 
 	function glide(from: Element, node: Element, intro: boolean): TransitionConfig {
 		if (reducedMotion()) return { duration: 0 };
@@ -122,8 +130,8 @@
 		const base = getComputedStyle(node).transform;
 		const pinned = base === 'none' ? '' : base;
 		return {
-			duration: Math.min(620, 320 + Math.sqrt(Math.hypot(dx, dy)) * 10),
-			easing: cubicInOut,
+			duration: FLIGHT_MS,
+			easing: easeOut,
 			// the arriving copy carries the movement; the leaving one is gone by halfway
 			css: (t, u) =>
 				`transform: ${pinned} translate(${(u * dx).toFixed(2)}px, ${(u * dy).toFixed(2)}px); opacity: ${
@@ -155,9 +163,9 @@
 		const pinned = (node as HTMLElement).style.transform;
 		// a category that empties waits for its last row to fly out before it fades
 		return {
-			delay: leaving ? 300 : 0,
-			duration: 240,
-			easing: cubicOut,
+			delay: leaving ? 160 : 0,
+			duration: 160,
+			easing: easeOut,
 			css: (t) => `opacity: ${t}; transform: ${pinned} scale(${(0.97 + 0.03 * t).toFixed(3)})`
 		};
 	}
@@ -165,6 +173,17 @@
 	const startEdit = (item: ShoppingItem) => {
 		editError = null;
 		editing = editing === item.id ? null : item.id;
+	};
+
+	// The editor leaves with a transition, inert, and a row that changes section is replaced by its flying copy: either
+	// way the focus inside is lost, so it goes to the live control, never to <body>.
+	async function focusLive(selector: string) {
+		await tick();
+		[...document.querySelectorAll<HTMLElement>(selector)].find((el) => !el.closest('[inert]'))?.focus();
+	}
+	const closeEdit = (id: Id) => {
+		editing = null;
+		void focusLive(`[data-edit="${id}"]`);
 	};
 
 	async function pickCategory(id: Id, category: Category) {
@@ -185,7 +204,7 @@
 		};
 	};
 
-	// Checking fills the box and draws the strike in place first, then the row flies into Checked;
+	// Checking fills the box and strikes the name in place first, then the row flies into Checked;
 	// unchecking flies it straight back.
 	const FILL_MS = 260;
 
@@ -193,15 +212,23 @@
 		const id = Number(formData.get('id'));
 		const hold = { checked: formData.get('checked') === '1', at: ++order };
 		let shown: Promise<void> = Promise.resolve();
+		const refocus = () => {
+			const at = document.activeElement;
+			if (at === document.body || at?.closest(`[data-check="${id}"]`)) void focusLive(`[data-check="${id}"]`);
+		};
 		if (!hold.checked || reducedMotion()) {
 			ticking.delete(id);
 			flipped.set(id, hold);
+			refocus();
 		} else {
 			ticking.set(id, hold.at);
 			flipped.set(id, { checked: false, at: hold.at });
 			shown = new Promise((resolve) =>
 				setTimeout(() => {
-					if (flipped.get(id)?.at === hold.at) flipped.set(id, hold);
+					if (flipped.get(id)?.at === hold.at) {
+						flipped.set(id, hold);
+						refocus();
+					}
 					resolve();
 				}, FILL_MS)
 			);
@@ -212,7 +239,15 @@
 			await update({ reset: false });
 			await shown;
 			if (flipped.get(id)?.at === hold.at) flipped.delete(id);
+			// a successful update() resets the focus to <body>
+			refocus();
 		};
+	};
+
+	// the field stays focused for the next item (and the phone keyboard stays up)
+	const submitAdd: SubmitFunction = () => async ({ update }) => {
+		await update();
+		await focusLive('#add-item');
 	};
 
 	const submitClear: SubmitFunction = () => {
@@ -230,15 +265,17 @@
 		if (deleting) {
 			hidden.add(id);
 			editing = null;
+			void focusLive('#add-item');
 		}
 		return async ({ result, update }) => {
 			if (result.type === 'failure') editError = { id, message: String(result.data?.error) };
 			else if (editing === id) editing = null;
 			await update({ reset: false });
 			hidden.delete(id);
+			// after the update: a rename can re-key the row
+			if (result.type !== 'failure' && !deleting) void focusLive(`[data-edit="${id}"]`);
 		};
 	};
-
 </script>
 
 {#snippet row(item: ShoppingItem)}
@@ -250,7 +287,7 @@
 		moving={menu?.item.id === item.id}
 		onedit={() => startEdit(item)}
 		onmove={(anchor) => (menu = { item, anchor })}
-		oncancel={() => (editing = null)}
+		oncancel={() => closeEdit(item.id)}
 		{submitCheck}
 		{submitEdit}
 	/>
@@ -260,103 +297,103 @@
 	<title>List · Rues Cooking Hub</title>
 </svelte:head>
 
-<div class="column page" data-column>
-	<header class="head">
-		<div data-page-header>
-			<Kicker parts={['Shopping list', `${open.length} open`]} />
-			<h1>Things to <em>buy</em></h1>
+<header class="screen-head">
+	<div class="screen-lead">
+		<ul class="kicker">
+			<li>Shopping list</li>
+			<li>{open.length.toLocaleString('en-GB')} open</li>
+		</ul>
+		<h1>Things to <em class="accent-word">buy</em></h1>
+	</div>
+	<form class="seg-bar list-bar" method="POST" action="?/add" use:enhance={submitAdd}>
+		<div class="seg add-item">
+			<Field id="add-item" name="text" label="Add an item" hideLabel placeholder="Add an item, e.g. 2 l oat milk" autocomplete="off" enterkeyhint="done">
+				{#snippet prefix()}<Icon name="plus" size={18} />{/snippet}
+			</Field>
 		</div>
-		<div class="tools">
-			<form class="add" method="POST" action="?/add" use:enhance>
-				<label class="add-field">
-					<Icon name="plus" size={18} />
-					<span class="visually-hidden">Add an item</span>
-					<input name="text" placeholder="Add an item, e.g. 2 l oat milk" autocomplete="off" enterkeyhint="done" />
-				</label>
-			</form>
-			<Button
-				variant="olive"
-				icon="calendar"
-				arrow={false}
-				aria-haspopup="dialog"
-				aria-expanded={planning}
-				onclick={() => (planning = !planning)}
-			>
+		<div class="seg-actions">
+			<Button variant="primary" arrow aria-haspopup="dialog" aria-expanded={planning} onclick={() => (planning = !planning)}>
 				Add from plan
 			</Button>
-			{#if planning}
-				<AddFromPlan week={data.week} onclose={() => (planning = false)} onadded={added} />
-			{/if}
 		</div>
-	</header>
-
-	<p class="notice" role="status">{#if notice}<span in:rise={{ y: 8 }}><Icon name="sparkle" size={16} />{notice}</span>{/if}</p>
-
-	<section class="open" aria-labelledby="open-title">
-		<div class="section-head">
-			<h2 id="open-title" data-section-heading>To buy</h2>
-			<p class="sub">By aisle</p>
-		</div>
-		{#if groups.length === 0}
-			<div class="empty" in:rise={{ y: 10 }}>
-				<p class="empty-title">Nothing to buy</p>
-				<p>Type an item above, or add the ingredients of the meals you planned.</p>
-			</div>
-		{/if}
-		<div class="cats" class:intro>
-			{#each groups as group, gi (group.id)}
-				<article
-					class="cat"
-					style:--delay="{stagger(gi)}ms"
-					animate:flip={flipOptions()}
-					in:category={{ leaving: false }}
-					out:category={{ leaving: true }}
-				>
-					<header class="cat-head">
-						<h3 id="cat-{group.id}">{group.label}</h3>
-						<span class="cat-count tnum">{group.items.length}</span>
-					</header>
-					<ul aria-labelledby="cat-{group.id}">
-						{#each group.items as item (keys.get(item.id))}
-							<li
-								animate:flip={flipOptions()}
-								in:receive|global={{ key: item.id }}
-								out:send|global={{ key: item.id }}
-							>
-								{@render row(item)}
-							</li>
-						{/each}
-					</ul>
-				</article>
+	</form>
+	{#if groups.length > 2}
+		<ul class="screen-facts" aria-label="Open per aisle">
+			<li class="facts-caption" aria-hidden="true">Open per aisle</li>
+			{#each groups as group (group.id)}
+				<li><span class="n">{group.items.length.toLocaleString('en-GB')}</span>{group.label}</li>
 			{/each}
-		</div>
-	</section>
+		</ul>
+	{/if}
+</header>
 
-	{#if items.length > 0}
-		<section class="checked" aria-labelledby="checked-title">
-			<div class="section-head">
-				<h2 id="checked-title" data-section-heading>
-					Checked {#key done.length}<span class="tnum" in:rise={{ y: 6 }}>{done.length}</span>{/key}
-				</h2>
-				<form method="POST" action="?/clear" use:enhance={submitClear}>
-					<Button variant="danger" type="submit" icon="trash" arrow={false} disabled={done.length === 0}>
-						Clear checked
-					</Button>
-				</form>
+{#if planning}
+	<AddFromPlan week={data.week} onclose={() => (planning = false)} onadded={added} />
+{/if}
+
+<div class="screen-body" data-settle={settle ? '' : undefined}>
+	<div role="status">
+		{#if notice}
+			<div class="notice"><Status live={false}>{notice}</Status></div>
+		{/if}
+	</div>
+
+	<div class="layout">
+		<section class="to-buy card" data-surface="solid" aria-labelledby="open-title">
+			<div class="card-head">
+				<h2 id="open-title">To buy</h2>
+				<p class="card-note">By aisle</p>
 			</div>
-			{#if done.length === 0}<p class="hint" in:rise={{ y: 6 }}>Tick things off as you shop; they gather here.</p>{/if}
-			<ul class="checked-list" aria-label="Checked items">
+			{#if groups.length === 0}
+				<div class="empty" in:rise={{ y: 10 }}>
+					<h3>Nothing to buy</h3>
+					<p>Type an item above, or add the ingredients of the meals you planned.</p>
+				</div>
+			{/if}
+			<div class="aisles">
+				{#each groups as group (group.id)}
+					<article
+						class="aisle"
+						animate:flipOnPage
+						in:category={{ leaving: false }}
+						out:category={{ leaving: true }}
+					>
+						<div class="aisle-head">
+							<h3 class="ruled" id="cat-{group.id}">{group.label}</h3>
+							<span class="card-note">{itemsText(group.items.length)}</span>
+						</div>
+						<ul class="items" aria-labelledby="cat-{group.id}">
+							{#each group.items as item (keys.get(item.id))}
+								<li animate:flipOnPage in:receive|global={{ key: item.id }} out:send|global={{ key: item.id }}>
+									{@render row(item)}
+								</li>
+							{/each}
+						</ul>
+					</article>
+				{/each}
+			</div>
+		</section>
+
+		<section class="checked card" data-surface="inverse" aria-labelledby="checked-title">
+			<h2 class="checked-head" id="checked-title">
+				<span class="ruled">Checked</span> {#key done.length}<span class="checked-n" in:rise={{ y: 6 }}>{done.length.toLocaleString('en-GB')}</span>{/key}
+			</h2>
+			{#if done.length === 0}<p class="checked-empty" in:rise={{ y: 6 }}>Tick things off as you shop; they gather here.</p>{/if}
+			<ul class="items checked-list" aria-label="Checked items">
 				{#each done as item (item.id)}
-					<li animate:flip={flipOptions()} in:receive|global={{ key: item.id }} out:send|global={{ key: item.id }}>
+					<li animate:flipOnPage in:receive|global={{ key: item.id }} out:send|global={{ key: item.id }}>
 						{@render row(item)}
 					</li>
 				{/each}
 			</ul>
+			<form method="POST" action="?/clear" use:enhance={submitClear}>
+				<Button size="s" type="submit" class="clear" disabled={done.length === 0}>Clear checked</Button>
+			</form>
 		</section>
-	{/if}
+	</div>
 </div>
 
-<form class="visually-hidden" method="POST" action="?/category" use:enhance={submitCategory} bind:this={categoryForm}>
+<form class="sr-only" method="POST" action="?/category" use:enhance={submitCategory} bind:this={categoryForm}>
 	<input type="hidden" name="id" value={move?.id ?? ''} />
 	<input type="hidden" name="category" value={move?.category ?? ''} />
 </form>
@@ -373,243 +410,181 @@
 {/if}
 
 <style>
-	.page {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-7);
+	.list-bar {
+		inline-size: min(100%, 40rem);
+		background: var(--surface-card);
 	}
 
-	.head {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: var(--s-5);
+	/* the aisle counts read on a solid card, never on glass over the photo */
+	.screen-head :global(.screen-facts:not([data-surface='inverse'])) {
+		background: var(--surface-card);
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
 	}
 
-	h1 {
-		margin-block-start: var(--s-3);
+	/* the nine aisle counts would push a long list a screen down; the aisle heads already carry them */
+	@media (max-width: 767px) {
+		.screen-head :global(.screen-facts) {
+			display: none;
+		}
 	}
 
-	h1 em {
-		color: var(--brick);
+	.add-item {
+		flex: 1;
+		min-inline-size: 0;
+		padding-inline-start: var(--space-1);
 	}
 
-	.tools {
-		position: relative;
-		display: flex;
-		gap: var(--s-2);
-		inline-size: min(100%, 640px);
-	}
-
-	.add {
-		display: flex;
+	/* the field takes the bar's spare width, so the placeholder is not cut */
+	.add-item > :global(.field) {
 		flex: 1;
 	}
 
 	.notice {
-		min-block-size: 0;
-		margin-block: calc(-1 * var(--s-5)) calc(-1 * var(--s-2));
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--olive);
-	}
-
-	.notice:empty {
-		display: none;
-	}
-
-	.notice span {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding: 6px 14px 6px 10px;
-		border-radius: var(--r-pill);
-		background: var(--olive-wash);
-	}
-
-	.add-field {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		flex: 1;
-		min-block-size: 48px;
-		padding: 0 var(--s-5);
-		border-radius: var(--r-pill);
-		background: var(--white);
-		border: 1px solid var(--line);
-		box-shadow: var(--shadow-card);
-		color: var(--olive);
-		transition:
-			border-color var(--d-fast) var(--ease-out),
-			box-shadow var(--d-fast) var(--ease-out);
-	}
-
-	.add-field:focus-within {
-		border-color: var(--olive);
-	}
-
-	.add-field input {
-		flex: 1;
 		min-inline-size: 0;
-		min-block-size: 46px;
-		border: 0;
-		background: none;
-		font-size: 15px;
 	}
 
-	.add-field input:focus-visible {
-		box-shadow: none;
+	.layout {
+		display: grid;
+		gap: var(--space-4);
+		align-items: start;
+		min-inline-size: 0;
 	}
 
-	.add-field input::placeholder {
-		color: var(--ink-2);
+	.to-buy {
+		display: grid;
+		gap: var(--space-5);
+		min-inline-size: 0;
+		padding: var(--space-5) var(--space-4);
 	}
 
-	.section-head {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--s-4);
-		margin-block-end: var(--s-4);
-	}
-
-	.sub {
-		font-size: 14px;
-		color: var(--ink-2);
-	}
-
-	.cats {
+	.aisles {
 		position: relative;
-		columns: 2;
-		column-gap: var(--s-4);
+		columns: 1;
 	}
 
-	.cat {
+	.aisle {
 		break-inside: avoid;
-		margin-block-end: var(--s-4);
-		padding: var(--s-5) var(--s-6) var(--s-3);
-		border-radius: var(--r-panel);
-		background: var(--surface);
-		box-shadow: var(--shadow-card);
+		margin-block-end: var(--space-6);
 	}
 
-	.intro .cat {
-		animation: rise-in var(--d-slow) var(--ease-out) var(--delay, 0ms) backwards;
-	}
-
-	@keyframes rise-in {
-		from {
-			opacity: 0;
-			transform: translateY(16px);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.intro .cat {
-			animation: none;
-		}
-	}
-
-	.cat-head {
+	.aisle-head {
 		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
-		padding-block-end: var(--s-2);
+		gap: var(--space-3);
+		margin-block-end: var(--space-1);
 	}
 
-	.cat-head h3 {
+	.items {
+		display: grid;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.items > li {
+		min-inline-size: 0;
+		box-shadow: var(--rule-below);
+	}
+
+	.empty {
+		display: grid;
+		gap: var(--space-2);
+		justify-items: start;
+		max-inline-size: var(--measure);
+		padding: var(--space-6) var(--space-2) var(--space-2);
+	}
+
+	.empty h3 {
+		font-size: var(--type-display-s-size);
+		line-height: var(--type-display-s-line);
+		letter-spacing: var(--type-display-s-tracking);
+	}
+
+	.empty p {
+		color: var(--ink-secondary);
+		font-size: var(--type-body-size);
+		line-height: var(--type-body-line);
+	}
+
+	.checked {
+		display: grid;
+		gap: var(--space-4);
+		align-content: start;
+		min-inline-size: 0;
+		padding: var(--space-5);
+	}
+
+	.checked-head {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-4);
+		font-family: var(--font-ui);
+	}
+
+	.checked-head .ruled {
+		color: var(--ink-on-inverse-secondary);
+	}
+
+	.checked-n {
 		font-family: var(--font-display);
-		font-size: 24px;
-		font-weight: 360;
+		font-weight: var(--weight-display);
+		font-size: var(--type-display-l-size);
+		line-height: 1;
+		letter-spacing: var(--type-display-l-tracking);
+		font-variant-numeric: var(--numeric-figures);
 	}
 
-	.cat-count {
-		font-family: var(--font-display);
-		font-size: 18px;
-		color: var(--ink-2);
-	}
-
-	.cat li {
-		border-block-start: 1px solid var(--line);
-		background: var(--surface);
-	}
-
-	.section-head h2 span {
-		display: inline-block;
-		font-size: 0.7em;
-		color: var(--ink-2);
-	}
-
-	.hint {
-		font-size: 14px;
-		color: var(--ink-2);
+	.checked-empty {
+		max-inline-size: 30ch;
+		font-size: var(--type-body-s-size);
+		color: var(--ink-on-inverse-secondary);
 	}
 
 	.checked-list {
 		position: relative;
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		column-gap: var(--s-6);
-		padding: var(--s-2) var(--s-6);
-		border-radius: var(--r-panel);
-		background: var(--sand);
 	}
 
 	.checked-list:empty {
 		display: none;
 	}
 
-	.checked-list li {
-		min-inline-size: 0;
-		background: var(--sand);
-		border-radius: var(--r-xs);
+	.checked-list > li {
+		box-shadow: var(--rule-below-on-inverse);
 	}
 
-	.empty {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--s-2);
-		padding: var(--s-9) var(--s-5);
-		border-radius: var(--r-panel);
-		border: 1px dashed var(--line);
-		text-align: center;
-		color: var(--ink-2);
+	.checked :global(.clear) {
+		justify-self: start;
+		background: var(--surface-inverse-tint);
+		box-shadow: var(--ring-control-on-inverse);
+		color: var(--ink-on-inverse);
 	}
 
-	.empty-title {
-		font-family: var(--font-display);
-		font-size: var(--t-display-3);
-		font-weight: 300;
-		color: var(--ink);
+	.checked :global(.clear:disabled) {
+		color: var(--ink-on-inverse-secondary);
 	}
 
-	@media (max-width: 1023px) {
-		.head {
-			flex-direction: column;
-			align-items: stretch;
+	@media (hover: hover) {
+		.checked :global(.clear:not(:disabled):hover) {
+			background: var(--surface-inverse-tint-strong);
+		}
+	}
+
+	@media (min-width: 768px) {
+		.to-buy {
+			padding: var(--space-6) var(--space-7);
 		}
 
-		.tools {
-			inline-size: 100%;
-			flex-direction: column;
+		.aisles {
+			columns: 2 18rem;
+			column-gap: var(--space-9);
 		}
+	}
 
-		.section-head {
-			flex-wrap: wrap;
-		}
-
-		.cats {
-			columns: 1;
-		}
-
-		.cat {
-			padding: var(--s-4) var(--s-5) var(--s-2);
-		}
-
-		.checked-list {
-			grid-template-columns: 1fr;
-			padding: var(--s-1) var(--s-5);
+	@media (min-width: 1100px) {
+		.layout {
+			grid-template-columns: minmax(0, 1fr) 18.75rem;
 		}
 	}
 </style>

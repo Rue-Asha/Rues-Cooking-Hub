@@ -1,9 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { allEntries, entries, open, reset, seed, setToday } from './helpers.ts';
 
-// the hero photo has an empty alt, so it is the page's one presentational image
-const photo = (page: Page) => page.getByRole('presentation');
-const info = (page: Page) => page.getByRole('main');
+const photo = (page: Page) => page.locator('img.stage-photo');
+const info = (page: Page) => page.locator('.app');
+// Edit and Delete recipe sit in the overflow menu
+const overflow = async (page: Page, name: string) => {
+	await page.getByRole('button', { name: 'More recipe actions' }).click();
+	await page.getByRole('menuitem', { name }).click();
+};
 
 const full = {
 	title: 'Pumpkin soup',
@@ -36,7 +40,7 @@ test('Scenario: Recipe page shows hero, info panel, sections and notes', async (
 
 	await expect(info(page).getByRole('heading', { level: 1 })).toHaveText('Pumpkin soup');
 	await expect(info(page).getByText('Prep 10 min · Cook 20 min · 30 min total')).toBeVisible();
-	await expect(info(page).getByText('4 servings', { exact: true })).toBeVisible();
+	await expect(info(page).getByLabel('Scale to servings')).toHaveValue('4');
 	await expect(info(page).getByText('Soup', { exact: true })).toBeVisible();
 	await expect(info(page).getByText('Autumn', { exact: true })).toBeVisible();
 	await expect(info(page).getByRole('button', { name: 'Add Pumpkin soup to favourites' })).toHaveAttribute('aria-pressed', 'false');
@@ -55,8 +59,11 @@ test('Scenario: Recipe page shows hero, info panel, sections and notes', async (
 	await expect(notes).toContainText('Freeze half before the cream.');
 	await expect(notes.getByRole('strong')).toHaveText('before');
 
-	for (const name of ['Add to plan', 'Delete recipe']) await expect(info(page).getByRole('button', { name })).toBeVisible();
-	await expect(info(page).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', `/recipes/${recipes[0]}/edit`);
+	await expect(info(page).getByRole('button', { name: 'Add to plan' })).toBeVisible();
+	await info(page).getByRole('button', { name: 'More recipe actions' }).click();
+	await expect(info(page).getByRole('menuitem', { name: 'Delete recipe' })).toBeVisible();
+	await info(page).getByRole('menuitem', { name: 'Edit' }).click();
+	await expect(page).toHaveURL(`/recipes/${recipes[0]}/edit`);
 });
 
 test('Scenario: Recipe page without image shows the placeholder hero', async ({ page, request }) => {
@@ -79,7 +86,7 @@ test('Scenario: Recipe without times shows no times on its page', async ({ page,
 	const { recipes } = await seed(request, { recipes: [{ ...full, prepMinutes: undefined, cookMinutes: undefined }] });
 	await open(page, `/recipes/${recipes[0]}`);
 
-	await expect(info(page).getByText('4 servings', { exact: true })).toBeVisible();
+	await expect(info(page).getByLabel('Scale to servings')).toHaveValue('4');
 	await expect(info(page).getByText(/\bmin\b/)).toHaveCount(0);
 	await expect(info(page).getByText(/\b(Prep|Cook|total)\b/)).toHaveCount(0);
 });
@@ -125,7 +132,7 @@ test('Scenario: Delete names the plan entries that use the recipe', async ({ pag
 	});
 	await open(page, `/recipes/${recipes[0]}`);
 
-	await info(page).getByRole('button', { name: 'Delete recipe' }).click();
+	await overflow(page, 'Delete recipe');
 	const dialog = page.getByRole('dialog', { name: 'Delete “Lasagne”?' });
 	await expect(dialog.getByRole('heading')).toHaveText('Delete “Lasagne”?');
 	await expect(dialog.getByText("It's used in 2 plan entries; they'll stay in the plan as text.")).toBeVisible();
@@ -141,7 +148,7 @@ test('Scenario: Recipe in no plan entry gets a plain confirm', async ({ page, re
 	const { recipes } = await seed(request, { recipes: [{ title: 'Porridge' }] });
 	await open(page, `/recipes/${recipes[0]}`);
 
-	await info(page).getByRole('button', { name: 'Delete recipe' }).click();
+	await overflow(page, 'Delete recipe');
 	const dialog = page.getByRole('dialog', { name: 'Delete “Porridge”?' });
 	await expect(dialog.getByRole('heading')).toHaveText('Delete “Porridge”?');
 	await expect(dialog.getByText(/plan/)).toHaveCount(0);

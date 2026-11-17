@@ -36,7 +36,7 @@ test('Scenario: Sparse card shows no empty parts', async ({ page, request }) => 
 	const card = page.getByRole('article');
 	await expect(card.getByRole('img', { name: 'No photo yet' })).toBeVisible();
 	await expect(card.getByRole('heading', { name: 'Bare Bones' })).toBeVisible();
-	await expect(card).toHaveText(/^\s*No photo yet\s*Bare Bones\s*$/);
+	await expect(card).toHaveText(/^\s*B\s*Bare Bones\s*$/);
 	expect(await card.innerText()).not.toContain(',');
 });
 
@@ -74,6 +74,7 @@ test('Scenario: Spot grid fits narrow phones', async ({ page, request }, info) =
 	]) {
 		await page.setViewportSize({ width, height });
 		await open(page, '/eating-out');
+		await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
 
 		const cards = page.getByRole('article');
 		const corner = (scope: Locator) => scope.getByText(/^(#\d+|\d+\.\d\d)$/);

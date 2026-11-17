@@ -2,7 +2,7 @@
 	import { fly } from 'svelte/transition';
 	import { reducedMotion } from '#lib/motion.ts';
 	import { SLOTS, type IsoDate, type PlanEntry, type Slot } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
+	import Button from '#lib/components/button/Button.svelte';
 	import type { Place } from './dnd.ts';
 	import Sheet from './Sheet.svelte';
 
@@ -58,7 +58,7 @@
 			<legend>Day</legend>
 			<div class="days">
 				{#each days as d (d)}
-					<label class="choice day" class:today={d === today}>
+					<label class="chip day" class:today={d === today}>
 						<input
 							type="radio"
 							name="date"
@@ -67,8 +67,8 @@
 							bind:group={date}
 							use:focus={d === start}
 						/>
-						<span class="wd" aria-hidden="true">{day(d, 'short')}</span>
-						<span class="num tnum" aria-hidden="true">{Number(d.slice(8))}</span>
+						<span aria-hidden="true">{day(d, 'short')}</span>
+						<span class="sub figures" aria-hidden="true">{Number(d.slice(8))}</span>
 					</label>
 				{/each}
 			</div>
@@ -78,7 +78,7 @@
 			<legend>Meal</legend>
 			<div class="slots">
 				{#each SLOTS as s (s.id)}
-					<label class="choice">
+					<label class="chip">
 						<input type="radio" name="slot" value={s.id} bind:group={slot} />
 						<span>{s.label}</span>
 					</label>
@@ -95,8 +95,8 @@
 				{/key}
 			</p>
 			<div class="actions">
-				<Button variant="secondary" arrow={false} onclick={onclose}>Cancel</Button>
-				<Button type="submit">Move here</Button>
+				<Button variant="quiet" onclick={onclose}>Cancel</Button>
+				<Button type="submit" variant="primary">Move here</Button>
 			</div>
 		</div>
 	</form>
@@ -106,13 +106,13 @@
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-5);
+		gap: var(--space-5);
 	}
 
 	fieldset {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-2);
+		gap: var(--space-2);
 		margin: 0;
 		padding: 0;
 		border: 0;
@@ -121,81 +121,86 @@
 
 	legend {
 		padding: 0;
-		margin-block-end: var(--s-2);
-		font-size: var(--t-kicker);
-		font-weight: 600;
-		letter-spacing: var(--tracking-kicker);
-		text-transform: uppercase;
-		color: var(--ink-2);
+		margin-block-end: var(--space-2);
+		font-size: var(--type-label-size);
+		line-height: var(--type-label-line);
+		font-weight: var(--type-label-weight);
+		color: var(--ink);
 	}
 
 	.days {
 		display: grid;
 		grid-template-columns: repeat(7, minmax(0, 1fr));
-		gap: 6px;
+		gap: var(--space-1-5);
 	}
 
 	.slots {
 		display: grid;
 		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 6px;
+		gap: var(--space-1-5);
 	}
 
-	.choice {
+	.slots .chip {
+		padding-inline: var(--space-2);
+		overflow-wrap: normal;
+		hyphens: none;
+	}
+
+	.chip {
 		position: relative;
-		isolation: isolate;
 		display: grid;
-		place-items: center;
+		justify-items: center;
 		align-content: center;
-		min-block-size: 48px;
-		padding: 6px 4px;
-		border-radius: var(--r-sm);
-		border: 1px solid var(--line);
-		font-size: 14px;
-		font-weight: 500;
+		gap: var(--space-0-5);
+		min-block-size: max(var(--control-height), var(--target));
+		min-inline-size: 0;
+		padding: var(--space-1-5) var(--space-0-5);
+		border-radius: var(--radius-control);
+		background: var(--surface-control-solid);
+		box-shadow: var(--ring-control);
 		color: var(--ink);
+		font-size: var(--type-label-size);
+		line-height: var(--type-label-line);
+		font-weight: var(--type-label-weight);
+		text-align: center;
 		cursor: pointer;
 		transition:
-			color var(--d-fast) var(--ease-out),
-			border-color var(--d-fast) var(--ease-out),
-			transform var(--d-fast) var(--ease-out);
+			background-color var(--motion-quick) var(--ease-out),
+			transform var(--motion-quick) var(--ease-out);
 	}
-
-	/* the fill grows out of the chip when it is picked */
-	.choice::before {
+	.chip:active {
+		transform: scale(0.97);
+	}
+	.chip:has(:checked) {
+		background: var(--surface-selected);
+		box-shadow: var(--ring-selected);
+	}
+	.chip:has(:focus-visible) {
+		outline: var(--focus-width) solid var(--focus-ring);
+		outline-offset: var(--focus-offset);
+	}
+	@media (hover: hover) {
+		.chip:not(:has(:checked)):hover {
+			background: var(--surface-control-solid-hover);
+		}
+	}
+	.chip .sub {
+		font-size: var(--type-caption-size);
+		font-weight: var(--weight-regular);
+		color: var(--ink-secondary);
+	}
+	.chip.today .sub::after {
 		content: '';
-		position: absolute;
-		inset: -1px;
-		z-index: -1;
-		border-radius: inherit;
-		background: var(--olive);
-		opacity: 0;
-		transform: scale(0.6);
-		transition:
-			opacity var(--d-fast) var(--ease-out),
-			transform var(--d-base) var(--ease-spring);
-	}
-
-	.choice:hover {
-		transform: translateY(-1px);
-	}
-
-	.choice:has(:checked) {
-		border-color: var(--olive);
-		color: var(--white);
-	}
-
-	.choice:has(:checked)::before {
-		opacity: 1;
-		transform: none;
-	}
-
-	.choice:has(:focus-visible) {
-		box-shadow: var(--focus-ring);
+		display: block;
+		inline-size: var(--space-1);
+		block-size: var(--space-1);
+		margin: var(--space-0-5) auto 0;
+		border-radius: var(--radius-round);
+		background: var(--ink);
 	}
 
 	/* the native radio stays the click target and the focus, the chip is its face */
-	.choice input {
+	.chip input {
 		position: absolute;
 		inset: 0;
 		margin: 0;
@@ -203,46 +208,19 @@
 		cursor: pointer;
 	}
 
-	.day {
-		min-block-size: 60px;
-		gap: 2px;
-	}
-
-	.wd {
-		font-size: 11px;
-		font-weight: 600;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		color: var(--ink-2);
-		transition: color var(--d-fast) var(--ease-out);
-	}
-
-	.day.today .wd {
-		color: var(--brick);
-	}
-
-	.day:has(:checked) .wd {
-		color: var(--olive-soft);
-	}
-
-	.num {
-		font-family: var(--font-display);
-		font-size: 20px;
-		line-height: 1;
-	}
-
 	.foot {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-3);
-		padding-block-start: var(--s-3);
-		border-block-start: 1px solid var(--line);
+		gap: var(--space-3);
+		padding-block-start: var(--space-3);
+		box-shadow: var(--sheet-footer-rule);
 	}
 
 	.where {
 		display: grid;
-		font-size: 14px;
-		color: var(--ink-2);
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		color: var(--ink-secondary);
 	}
 
 	.where > span {
@@ -250,14 +228,15 @@
 	}
 
 	.where strong {
-		font-weight: 600;
+		font-weight: var(--weight-semibold);
 		color: var(--ink);
 	}
 
 	.actions {
 		display: flex;
-		justify-content: space-between;
-		gap: var(--s-3);
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: var(--space-2);
 	}
 
 	@media (max-width: 479px) {
@@ -271,10 +250,6 @@
 			flex-direction: row;
 			align-items: center;
 			justify-content: space-between;
-		}
-
-		.actions {
-			justify-content: flex-end;
 		}
 	}
 </style>

@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { beforeNavigate } from '$app/navigation';
 	import { untrack } from 'svelte';
 	import { flip } from 'svelte/animate';
+	import Button from '#lib/components/button/Button.svelte';
+	import Field from '#lib/components/field/Field.svelte';
+	import Select from '#lib/components/select/Select.svelte';
 	import { flipOptions } from '#lib/motion.ts';
 	import type { ArchiveSort, TagWithCount } from '#lib/types.ts';
-	import Chip from '#lib/ui/Chip.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { SORTS, toggleTag, type ParsedQuery } from './query.ts';
 
@@ -13,14 +16,14 @@
 		onquery
 	}: { tags: TagWithCount[]; query: ParsedQuery; onquery: (next: ParsedQuery, replace?: boolean) => void } = $props();
 
-	// Selected tags lead the row so they are in view after a reload or Back; the order is taken once, because a chip
-	// that jumped to the front on click would leave the pointer and slide across its neighbours.
-	const lead = untrack(() => query.tagIds);
-	const rank = (id: number) => (lead.includes(id) ? 0 : 1);
-	// unused tags would only lead to an empty grid
-	const chips = $derived(
-		tags.filter((t) => t.count > 0 || query.tagIds.includes(t.id)).sort((a, b) => rank(a.id) - rank(b.id))
-	);
+	const COLLAPSED = 8;
+	const sortLabel: Partial<Record<ArchiveSort, string>> = { time: 'Total time' };
+
+	// unused tags would only lead to an empty list
+	const used = $derived(tags.filter((t) => t.count > 0 || query.tagIds.includes(t.id)));
+	let expanded = $state(false);
+	// a selected tag outside the first eight stays where it sits in the tag order while the filter is collapsed
+	const chips = $derived(expanded ? used : used.filter((t, i) => i < COLLAPSED || query.tagIds.includes(t.id)));
 
 	let q = $state(untrack(() => query.q));
 	// what this field last put into the URL; any other incoming value (Back, Clear filters) replaces the text
@@ -44,154 +47,114 @@
 		}, 200);
 	}
 
-	const sortLabel = $derived(SORTS.find((s) => s.id === query.sort)?.label);
+	// a search still waiting when the user leaves would navigate back here and cut that navigation short
+	beforeNavigate(({ from, to }) => {
+		if (to?.url.pathname !== from?.url.pathname) clearTimeout(timer);
+	});
+
+	const lang = (text: string) => (/[^\u0000-ɏ]/.test(text) ? 'und' : undefined);
 </script>
 
-<div class="filters">
-	<div class="chips" role="group" aria-label="Filter by tag">
-		<Chip
-			label="Favourites"
-			icon="heart"
-			active={query.favouritesOnly}
+<div class="tools">
+	<Field label="Search recipes" hideLabel type="search" placeholder="Search recipes or ingredients" autocomplete="off" bind:value={q} oninput={search}>
+		{#snippet prefix()}<Icon name="search" size={18} stroke={1.75} />{/snippet}
+	</Field>
+	<Select label="Sort recipes" hideLabel value={query.sort} onchange={(e) => onquery({ ...query, sort: e.currentTarget.value as ArchiveSort })}>
+		{#each SORTS as s (s.id)}<option value={s.id}>{sortLabel[s.id] ?? s.label}</option>{/each}
+	</Select>
+</div>
+
+<div class="filter" role="group" aria-label="Filter by tag">
+	<div class="chips">
+		<button
+			type="button"
+			class="chip"
+			aria-pressed={query.favouritesOnly}
+			data-press
 			onclick={() => onquery({ ...query, favouritesOnly: !query.favouritesOnly })}
-		/>
+		>
+			{#if query.favouritesOnly}<Icon name="check" size={16} stroke={1.75} />{/if}Favourites
+		</button>
 		{#each chips as tag (tag.id)}
-			<span class="chip-slot" animate:flip={flipOptions()}>
-				<Chip
-					label={tag.name}
-					count={tag.count}
-					active={query.tagIds.includes(tag.id)}
-					onclick={() => onquery(toggleTag(query, tag.id))}
-				/>
+			{@const on = query.tagIds.includes(tag.id)}
+			<span class="slot" animate:flip={flipOptions()}>
+				<button type="button" class="chip" aria-pressed={on} data-press title={tag.name} lang={lang(tag.name)} onclick={() => onquery(toggleTag(query, tag.id))}>
+					{#if on}<Icon name="check" size={16} stroke={1.75} />{/if}<span class="t">{tag.name}</span><span class="c">{tag.count.toLocaleString('en-GB')}</span>
+				</button>
 			</span>
 		{/each}
 	</div>
-	<label class="search">
-		<Icon name="search" size={18} />
-		<span class="visually-hidden">Search recipes</span>
-		<input type="search" placeholder="Search recipes or ingredients" bind:value={q} oninput={search} />
-	</label>
-	<label class="sort">
-		<Icon name="sort" size={18} />
-		<span class="sort-label" aria-hidden="true">{sortLabel}</span>
-		<Icon name="chevron-down" size={16} />
-		<select
-			aria-label="Sort recipes"
-			onchange={(e) => onquery({ ...query, sort: e.currentTarget.value as ArchiveSort })}
-		>
-			{#each SORTS as s (s.id)}<option value={s.id} selected={s.id === query.sort}>{s.label}</option>{/each}
-		</select>
-	</label>
+	{#if used.length > COLLAPSED}
+		<Button variant="quiet" size="s" aria-expanded={expanded} onclick={() => (expanded = !expanded)}>
+			{expanded ? 'Show fewer tags' : `Show all ${used.length.toLocaleString('en-GB')} tags`}
+		</Button>
+	{/if}
 </div>
 
 <style>
-	.filters {
-		display: flex;
-		align-items: center;
-		gap: var(--s-3);
+	.tools {
+		display: grid;
+		gap: var(--space-2);
+		min-inline-size: 0;
 	}
-
+	.filter {
+		display: grid;
+		gap: var(--space-1);
+		justify-items: start;
+		min-inline-size: 0;
+	}
 	.chips {
 		display: flex;
-		gap: var(--s-2);
-		flex: 1;
+		flex-wrap: wrap;
+		gap: var(--space-2);
 		min-inline-size: 0;
-		overflow-x: auto;
-		scrollbar-width: none;
-		/* room for the focus ring inside the scroller */
-		padding-block: 4px;
-		margin-block: -4px;
-		mask-image: linear-gradient(90deg, var(--ink) 88%, transparent);
+		max-inline-size: 100%;
 	}
-
-	.search {
+	.slot {
 		display: flex;
-		align-items: center;
-		gap: 8px;
-		flex: none;
-		inline-size: 280px;
-		min-block-size: 44px;
-		padding: 0 var(--s-4);
-		border-radius: var(--r-pill);
-		background: var(--surface);
-		border: 1px solid var(--line);
-		color: var(--ink-2);
-		transition: border-color var(--d-fast) var(--ease-out);
-	}
-
-	.search:focus-within {
-		border-color: var(--olive);
-	}
-
-	.search input {
-		flex: 1;
 		min-inline-size: 0;
-		border: 0;
-		background: transparent;
-		font-size: 14px;
-		color: var(--ink);
+		max-inline-size: 100%;
 	}
-
-	.search input:focus-visible {
-		box-shadow: none;
-	}
-
-	.search input::placeholder {
-		color: var(--ink-2);
-	}
-
-	.sort {
-		position: relative;
+	.chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
-		flex: none;
-		min-block-size: 44px;
-		padding: 0 var(--s-4);
-		border-radius: var(--r-pill);
-		border: 1px solid var(--line);
-		font-size: 14px;
-		font-weight: 500;
+		gap: var(--space-1-5);
+		max-inline-size: 100%;
+		min-block-size: max(var(--control-height-s), var(--target));
+		padding-inline: var(--space-3-5);
+		border: 0;
+		border-radius: var(--radius-pill);
+		background: var(--surface-raised);
+		box-shadow: var(--ring-control);
+		color: var(--ink);
+		font-size: var(--type-label-size);
+		line-height: var(--type-label-line);
+		font-weight: var(--type-label-weight);
+		text-align: start;
 	}
-
-	.sort:has(select:focus-visible) {
-		box-shadow: var(--focus-ring);
+	.chip .t {
+		min-inline-size: 0;
+		overflow-wrap: anywhere;
 	}
-
-	/* the native picker sits invisibly over the pill, so phone and keyboard get the system list */
-	.sort select {
-		position: absolute;
-		inset: 0;
-		inline-size: 100%;
-		opacity: 0;
-		cursor: pointer;
-		font-size: 16px;
+	.chip .c {
+		color: var(--ink-secondary);
+		font-weight: var(--weight-regular);
+		font-size: var(--type-caption-size);
+		font-variant-numeric: var(--numeric-figures);
 	}
-
-	.chip-slot {
-		display: flex;
-		flex: none;
+	.chip[aria-pressed='true'] {
+		background: var(--surface-selected);
+		box-shadow: var(--ring-selected);
 	}
-
-	@media (max-width: 1023px) {
-		.filters {
-			flex-wrap: wrap;
+	@media (hover: hover) {
+		.chip:not([aria-pressed='true']):hover {
+			background: var(--surface-sunken);
 		}
-
-		.chips {
-			flex: 0 0 100%;
-			margin-inline: calc(-1 * var(--gutter));
-			padding-inline: var(--gutter);
-			mask-image: none;
-		}
-
-		.search {
-			flex: 1;
-			inline-size: auto;
-		}
-
-		.sort-label {
-			display: none;
+	}
+	@media (min-width: 768px) {
+		.tools {
+			grid-template-columns: minmax(0, 1fr) 14rem;
+			align-items: end;
 		}
 	}
 </style>

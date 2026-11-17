@@ -13,6 +13,8 @@ function spotCount(): number {
 
 // The nav comes from the app layout; the guard reacts to any in-app link, so one is added when the layout has none.
 async function planLink(page: Page) {
+	// the phone bar is hidden and inert while a text field has focus
+	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 	const link = page.getByRole('link', { name: 'Plan', exact: true });
 	if ((await link.count()) === 0) {
 		await page.evaluate(() => {

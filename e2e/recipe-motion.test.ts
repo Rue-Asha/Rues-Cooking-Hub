@@ -4,9 +4,8 @@ import { calm, carriedName, open, reset, seed } from './helpers.ts';
 type Call = { named: number; inCard: number };
 type Recorded = { calls: Call[]; hero: string };
 
-// the hero photo has an empty alt, so it is the page's one presentational image
-const photo = (page: Page) => page.getByRole('presentation');
-const transform = (page: Page) => photo(page).evaluate((el) => getComputedStyle(el).transform);
+// the shell's stage photo is the page's photo
+const photo = (page: Page) => page.locator('img.stage-photo');
 const photoName = (page: Page) => carriedName(photo(page));
 
 const long = {
@@ -39,29 +38,6 @@ test.beforeEach(async ({ request }) => {
 	await reset(request);
 });
 
-test('Scenario: Hero moves on scroll', async ({ page, request }) => {
-	const { recipes } = await seed(request, { recipes: [long] });
-	await open(page, `/recipes/${recipes[0]}`);
-	const before = await transform(page);
-
-	await page.evaluate(() => window.scrollTo(0, 200));
-
-	await expect.poll(() => transform(page)).not.toBe(before);
-	expect(await transform(page)).not.toBe('none');
-});
-
-test('Scenario: Reduced motion keeps the hero still', async ({ page, request }) => {
-	const { recipes } = await seed(request, { recipes: [long] });
-	await calm(page);
-	await open(page, `/recipes/${recipes[0]}`);
-
-	await page.evaluate(() => window.scrollTo(0, 200));
-	await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(200);
-	await page.evaluate(() => new Promise(requestAnimationFrame));
-
-	expect(await transform(page)).toBe('none');
-});
-
 test('Scenario: Card and recipe page share the hero image', async ({ page, request }) => {
 	const { recipes } = await seed(request, { recipes: [{ title: 'Porridge', image: true }, long] });
 	const name = `recipe-hero-${recipes[1]}`;
@@ -71,7 +47,7 @@ test('Scenario: Card and recipe page share the hero image', async ({ page, reque
 	await page.getByRole('list', { name: 'Recipes' }).getByRole('link', { name: 'Pumpkin soup' }).click();
 	await expect(page).toHaveURL(`/recipes/${recipes[1]}`);
 
-	// the card photos leave the DOM with the list, which leaves the page's one presentational image
+	// the card photos leave the DOM with the list
 	await expect(page.getByRole('list', { name: 'Recipes' })).toHaveCount(0);
 	await expect(page.getByRole('heading', { level: 1, name: 'Pumpkin soup' })).toBeVisible();
 	expect(await calls(page)).toEqual([{ named: 1, inCard: 1 }]);

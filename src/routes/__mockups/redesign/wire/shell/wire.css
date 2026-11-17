@@ -1,0 +1,29 @@
+/* Gate 4 wireframe parts shared by the shell and Home screens: greyscale, hairlines instead of shadows. */
+.w-page { display: grid; gap: var(--space-8); min-inline-size: 0; }
+.w-head { display: grid; gap: var(--space-3); justify-items: start; min-inline-size: 0; }
+.w-head h1 { font-size: var(--type-display-l-size); line-height: var(--type-display-l-line); letter-spacing: var(--type-display-l-tracking); max-inline-size: 100%; overflow-wrap: anywhere; }
+.w-kicker { font-size: var(--type-kicker-size); line-height: var(--type-kicker-line); letter-spacing: var(--type-kicker-tracking); font-weight: var(--type-kicker-weight); text-transform: uppercase; color: var(--ink-secondary); }
+.w-lede { max-inline-size: var(--lede-max); font-size: var(--type-body-size); line-height: var(--type-body-line); color: var(--ink-secondary); }
+
+.w-card { display: grid; gap: var(--space-3); align-content: start; min-inline-size: 0; padding: var(--space-5); border-radius: var(--radius-card-s); background: var(--surface-card); box-shadow: var(--ring-hairline); }
+.w-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1-5) var(--space-4); }
+.w-card-head h2 { font-size: var(--type-display-s-size); line-height: var(--type-display-s-line); letter-spacing: var(--type-display-s-tracking); min-inline-size: 0; overflow-wrap: anywhere; }
+.w-note { font-size: var(--type-caption-size); line-height: var(--type-caption-line); color: var(--ink-muted); font-variant-numeric: var(--numeric-figures); }
+
+.w-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-block-size: var(--control-height-s); padding-inline: var(--space-4); border: 0; border-radius: var(--radius-control); background: var(--surface-control-solid); color: var(--ink); box-shadow: var(--ring-control); font-size: var(--type-label-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight); text-decoration: none; max-inline-size: 100%; }
+.w-btn.primary { background: var(--surface-inverse); color: var(--ink-on-inverse); box-shadow: none; }
+.w-btn.touch { min-block-size: var(--target-touch); }
+.w-link { display: inline-flex; align-items: center; gap: var(--space-1-5); min-block-size: var(--target-touch); color: var(--ink); font-size: var(--type-label-size); font-weight: var(--type-label-weight); }
+
+/* a grey stand-in for a photo; never a gradient, never a picture */
+.w-ph { display: grid; place-items: center; min-inline-size: 0; background: var(--surface-tint-strong); color: var(--ink-secondary); font-size: var(--type-caption-size); text-align: center; overflow: hidden; }
+.w-chip { display: inline-flex; align-items: center; max-inline-size: 100%; min-block-size: var(--control-height-xs); padding-inline: var(--space-3); border-radius: var(--radius-pill); background: var(--surface-tint); font-size: var(--type-caption-size); line-height: var(--type-caption-line); overflow-wrap: anywhere; }
+.w-meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--type-caption-size); line-height: var(--type-caption-line); color: var(--ink-secondary); font-variant-numeric: var(--numeric-figures); }
+.w-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+
+.w-clamp-2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.w-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
+
+/* a labelled state on a screen sheet; rules, not boxes of colour */
+.w-states { display: grid; gap: var(--space-8); }
+.w-states > h2 { font-size: var(--type-display-s-size); line-height: var(--type-display-s-line); }

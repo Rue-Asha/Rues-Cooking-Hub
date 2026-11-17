@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
-import { allEntries, entries, open, reset, seed, setToday, slot } from './helpers.ts';
+import { allEntries, entries, expectNoEntries, open, reset, seed, setToday, slot } from './helpers.ts';
 
 const MONDAY = '2026-10-19';
+const TUESDAY = '2026-10-20';
 const THURSDAY = '2026-10-22';
 const FRIDAY = '2026-10-23';
 
@@ -43,7 +44,7 @@ test('Scenario: Move to moves an entry on phone', async ({ page, request }, info
 
 	await page.reload();
 	await expect(entries(page, THURSDAY, 'breakfast')).toContainText(['Porridge', 'Lasagne']);
-	await expect(entries(page, MONDAY, 'dinner')).toHaveCount(0);
+	await expectNoEntries(page, MONDAY, 'dinner');
 });
 
 test('Scenario: Move to is the keyboard alternative on desktop', async ({ page, request }, info) => {
@@ -79,8 +80,6 @@ test('Scenario: Move to is the keyboard alternative on desktop', async ({ page, 
 });
 
 test.describe('drag & drop', () => {
-	const SATURDAY = '2026-10-24';
-	const SUNDAY = '2026-10-25';
 
 	test.beforeEach(({}, info) => {
 		test.skip(info.project.name !== 'desktop', 'drag & drop is desktop-only');
@@ -117,12 +116,12 @@ test.describe('drag & drop', () => {
 			entries: [{ date: MONDAY, slot: 'dinner', recipe: 0, servings: 2 }]
 		});
 		await open(page, '/plan');
-		await titles(page, MONDAY, 'dinner').first().dragTo(slot(page, SATURDAY, 'lunch'));
-		await expect(titles(page, SATURDAY, 'lunch')).toContainText(['Lasagne']);
+		await titles(page, MONDAY, 'dinner').first().dragTo(slot(page, TUESDAY, 'lunch'));
+		await expect(titles(page, TUESDAY, 'lunch')).toContainText(['Lasagne']);
 		await expect(titles(page, MONDAY, 'dinner')).toHaveCount(0);
 		await page.reload();
-		await expect(entries(page, SATURDAY, 'lunch')).toContainText(['Lasagne']);
-		await expect(entries(page, MONDAY, 'dinner')).toHaveCount(0);
+		await expect(entries(page, TUESDAY, 'lunch')).toContainText(['Lasagne']);
+		await expectNoEntries(page, MONDAY, 'dinner');
 	});
 
 	test('Scenario: Reorder entries within a slot', async ({ page, request }) => {
@@ -135,7 +134,18 @@ test.describe('drag & drop', () => {
 		});
 		await open(page, '/plan');
 		const dinner = titles(page, MONDAY, 'dinner');
-		await dinner.nth(1).dragTo(dinner.nth(0));
+		const grab = (await dinner.nth(1).boundingBox())!;
+		await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
+		await page.mouse.down();
+		// the card and its slot lift when the drag starts, so the target is measured again once the slot answers
+		await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2 - 10, { steps: 4 });
+		await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2 - 8);
+		await expect(slot(page, MONDAY, 'dinner')).toHaveAttribute('data-drop-target', /.*/);
+		const to = (await dinner.nth(0).boundingBox())!;
+		await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 });
+		await page.mouse.move(to.x + to.width / 2 + 2, to.y + to.height / 2 + 2);
+		await expect(page.locator('.entry-wrap.before')).toHaveCount(1);
+		await page.mouse.up();
 		await expect(dinner).toContainText(['Salad', 'Lasagne']);
 		await page.reload();
 		await expect(entries(page, MONDAY, 'dinner')).toContainText(['Salad', 'Lasagne']);
@@ -145,14 +155,14 @@ test.describe('drag & drop', () => {
 		await seed(request, { entries: [{ date: MONDAY, slot: 'dinner', text: 'Salad' }] });
 		await open(page, '/plan');
 		const from = (await titles(page, MONDAY, 'dinner').first().boundingBox())!;
-		const to = (await slot(page, SUNDAY, 'breakfast').boundingBox())!;
+		const to = (await slot(page, TUESDAY, 'breakfast').boundingBox())!;
 		await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
 		await page.mouse.down();
 		await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 });
 		// Playwright's intercepted drag reports each dragover on the next move, so the pointer hovers a little
 		await page.mouse.move(to.x + to.width / 2 + 2, to.y + to.height / 2 + 2);
 		await expect(page.locator('[data-drop-target]')).toHaveCount(1);
-		await expect(slot(page, SUNDAY, 'breakfast')).toHaveAttribute('data-drop-target');
+		await expect(slot(page, TUESDAY, 'breakfast')).toHaveAttribute('data-drop-target');
 		await page.mouse.up();
 		await expect(page.locator('[data-drop-target]')).toHaveCount(0);
 	});

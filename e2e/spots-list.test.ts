@@ -36,7 +36,7 @@ test('Scenario: Empty Eating Out invites the first spot', async ({ page, request
 	await open(page, '/eating-out');
 
 	await expect(page.getByRole('heading', { name: 'Start your list' })).toBeVisible();
-	await expect(page.getByRole('img', { name: 'Your first spot goes here' })).toBeVisible();
+	await expect(page.getByText('Keep the places you loved, and the ones you still want to try.')).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Add spot' }).first()).toHaveAttribute('href', '/eating-out/new');
 	await expect(segment(page)).toHaveCount(0);
 	await expect(page.getByRole('searchbox')).toHaveCount(0);
@@ -62,31 +62,4 @@ test('Scenario: Phone page carries Add spot', async ({ page, request }, info) =>
 	const add = page.getByRole('main').getByRole('link', { name: 'Add spot' });
 	await expect(add).toBeVisible();
 	await expect(add).toHaveAttribute('href', '/eating-out/new');
-});
-
-test('Eating Out list screenshot', async ({ page, request }, info) => {
-	await reset(request);
-	await seed(request, {
-		spots: [
-			{ name: 'Brasserie Lumière', status: 'visited', scoreHundredths: 900, price: 3, neighbourhood: 'Mitte', city: 'Berlin', tags: ['Brasserie', 'Date night', 'Wine'], image: '/mockups/spot-interior.jpg' },
-			{ name: 'Terraza Pujol', status: 'visited', scoreHundredths: 900, price: 2, neighbourhood: 'Malasaña', city: 'Madrid', tags: ['Tapas', 'Terrace'], image: '/mockups/spot-terrace.jpg' },
-			{ name: 'Kuro Ramen', status: 'visited', scoreHundredths: 875, price: 2, neighbourhood: 'Kreuzberg', city: 'Berlin', tags: ['Ramen', 'Casual', 'Late'], image: '/mockups/spot-ramen.jpg' },
-			{ name: 'Chalet Sauvage', status: 'visited', scoreHundredths: 810, price: 2, city: 'Villard-Reculas', tags: ['Pizza', 'Mountains'], image: '/mockups/spot-pizzeria.jpg' },
-			{ name: 'Weinbar Kupfer', price: 3, neighbourhood: 'Sternschanze', city: 'Hamburg', tags: ['Wine', 'Date night'], image: '/mockups/spot-wine-bar.jpg', createdAt: '2026-10-03T10:00:00.000Z' },
-			{ name: 'Morgenrot Café', price: 1, neighbourhood: 'Prenzlauer Berg', city: 'Berlin', tags: ['Brunch', 'Coffee'], image: '/mockups/yoghurt-bowl.jpg', createdAt: '2026-10-02T10:00:00.000Z' },
-			{ name: 'Pasta Fresca', city: 'Berlin', createdAt: '2026-10-01T10:00:00.000Z' }
-		]
-	});
-
-	const shoot = async (path: string, file: string) => {
-		await open(page, path);
-		await page.evaluate(async () => {
-			for (const img of document.querySelectorAll('img')) img.loading = 'eager';
-			await Promise.all([...document.images].map((img) => img.decode().catch(() => undefined)));
-		});
-		await page.waitForTimeout(900);
-		await page.screenshot({ path: `test-results/shots/${file}-${info.project.name}.png`, fullPage: true });
-	};
-	await shoot('/eating-out', 'eating-out-list');
-	await shoot('/eating-out?status=want', 'eating-out-list-want');
 });

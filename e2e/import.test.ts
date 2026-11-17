@@ -96,13 +96,13 @@ test('Reduced motion keeps the progress text without the sweep', async ({ page }
 
 	await expect(page.getByRole('status').filter({ hasText: 'Reading the page…' })).toBeVisible();
 	const running = await page.evaluate(
-		() => document.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSTransition)).length
+		() => document.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSTransition) && (a.effect as KeyframeEffect).getKeyframes().some((k) => ['transform', 'translate', 'scale', 'rotate', 'backgroundPosition'].some((p) => p in k))).length
 	);
 	expect(running).toBe(0);
 });
 
 const save = (page: import('@playwright/test').Page) =>
-	page.getByRole('region', { name: 'Recipe preview' }).getByRole('button', { name: 'Save recipe' }).first().click();
+	page.getByRole('button', { name: 'Save recipe' }).click();
 
 test('Scenario: Import shows an editable preview', async ({ page }) => {
 	await open(page, '/recipes/new');
@@ -243,15 +243,52 @@ test('A blocked page falls back to the form with only the link', async ({ page }
 	await expect(page.getByLabel('Source')).toHaveValue(`${fixtures.url}/status/403`);
 });
 
-test('The failure message rises in, and stays still under reduced motion', async ({ page }) => {
+test('The failure message rises in with the preview, and stays still under reduced motion', async ({ page }) => {
 	await open(page, '/recipes/new');
 	await importIt(page, '/pages/meta-only.html');
 	const message = page.getByRole('alert').filter({ hasText: "Couldn't read a recipe from this page" });
 	await expect(message).toBeVisible();
-	expect(await message.evaluate((el) => getComputedStyle(el).animationName)).not.toBe('none');
+	const region = page.getByRole('region', { name: 'Recipe preview' });
+	expect(await region.evaluate((el) => getComputedStyle(el).animationName)).not.toBe('none');
 
 	await calm(page);
 	await importIt(page, '/status/404');
 	await expect(page.getByLabel('Source')).toHaveValue(`${fixtures.url}/status/404`);
-	expect(await message.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+	expect(await region.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+});
+
+test('A kept draft comes back as the preview on the import page, and Discard draft brings the link field back', async ({ page }) => {
+	await open(page, '/recipes/new/form');
+	await page.getByLabel('Title', { exact: true }).fill('Half a pie');
+
+	await open(page, '/recipes/new');
+
+	await expect(page.getByRole('region', { name: 'Recipe preview' })).toBeVisible();
+	await expect(page.getByText('Restored your unsaved draft')).toBeVisible();
+	await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Half a pie');
+	await expect(field(page)).toHaveCount(0);
+
+	await page.getByRole('button', { name: 'Discard draft' }).click();
+
+	await expect(field(page)).toBeVisible();
+	await expect(page.getByRole('region', { name: 'Recipe preview' })).toHaveCount(0);
+});
+
+test('A restored import keeps saying where it was read from, also after the next edit and reload', async ({ page }) => {
+	await open(page, '/recipes/new');
+	await importIt(page, '/pages/lemon-tart.html');
+	const title = page.getByLabel('Title', { exact: true });
+	await expect(page.getByText('Read from 127.0.0.1')).toBeVisible();
+	await title.fill('Lemon tart, less sugar');
+
+	await page.reload();
+	await page.locator('html[data-hydrated]').waitFor({ state: 'attached' });
+	await expect(page.getByText('Restored your unsaved draft')).toBeVisible();
+	await expect(page.getByText(/^Read from 127\.0\.0\.1/)).toBeVisible();
+
+	await title.fill('Lemon tart, no sugar');
+	await page.reload();
+	await page.locator('html[data-hydrated]').waitFor({ state: 'attached' });
+	await expect(title).toHaveValue('Lemon tart, no sugar');
+	await expect(page.getByText(/^Read from 127\.0\.0\.1/)).toBeVisible();
 });

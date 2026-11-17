@@ -30,13 +30,14 @@
 </script>
 
 <script lang="ts">
-	import { cubicOut } from 'svelte/easing';
-	import { slide } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
 	import { parseIngredient } from '#lib/ingredients/parse.ts';
-	import { pop, reducedMotion } from '#lib/motion.ts';
+	import { arrive, flipOptions, pop, slideOut } from '#lib/motion.ts';
 	import { tick } from 'svelte';
-	import Button from '#lib/ui/Button.svelte';
-	import IconButton from '#lib/ui/IconButton.svelte';
+	import Button from '#lib/components/button/Button.svelte';
+	import Field from '#lib/components/field/Field.svelte';
+	import Icon from '#lib/ui/Icon.svelte';
+	import Area from './Area.svelte';
 
 	let { kind, sections = $bindable() }: { kind: 'ingredients' | 'steps'; sections: EditorSection[] } = $props();
 
@@ -46,9 +47,10 @@
 
 	let root: HTMLElement;
 
-	// Rows make room for each other, so they animate height and opacity (slide), unlike the transform-only entrances.
-	const collapse = () => ({ duration: reducedMotion() ? 0 : 240, easing: cubicOut });
 	const amount = (q: number) => String(Number(q.toFixed(2)));
+
+	// a step number counts on through the sections, like the recipe page numbers them
+	const before = (si: number) => sections.slice(0, si).reduce((n, s) => n + s.lines.length, 0);
 
 	async function addLine(section: EditorSection, after = section.lines.length - 1) {
 		const line = { id: nextId(), text: '' };
@@ -81,219 +83,179 @@
 	}
 </script>
 
-<div class="editor" class:steps bind:this={root}>
+<div class="editor" bind:this={root}>
 	{#each sections as section, si (section.id)}
-		<div class="section" role="group" aria-label="{noun} section {si + 1}" transition:slide={collapse()}>
+		<div class="section" role="group" aria-label="{noun} section {si + 1}" animate:flip={flipOptions()} in:arrive out:slideOut>
 			<div class="section-head">
-				<input
-					class="section-title"
+				<Field
+					label="Section title"
+					hideLabel
 					name={steps ? 'stepSection' : 'ingredientSection'}
 					bind:value={section.title}
 					placeholder="Section title (optional)"
-					aria-label="Section title"
+					autocomplete="off"
 				/>
 				{#if sections.length > 1}
-					<IconButton icon="trash" label="Remove section" variant="plain" onclick={() => removeSection(si)} />
+					<Button variant="quiet" size="s" onclick={() => removeSection(si)}>Remove section</Button>
 				{/if}
 			</div>
 
 			<ol class="lines">
 				{#each section.lines as line, li (line.id)}
-					<li class="line" transition:slide={collapse()}>
+					<li class="line" animate:flip={flipOptions()} in:arrive out:slideOut>
 						{#if steps}
-							<span class="no tnum">{String(li + 1).padStart(2, '0')}</span>
-							<textarea
-								name="stepLine"
-								rows="2"
-								bind:value={line.text}
-								data-line={line.id}
-								aria-label="Step {li + 1}"
-								placeholder={li === 0 ? 'Describe the first step' : ''}
-							></textarea>
+							<div class="line-main step">
+								<span class="num" aria-hidden="true">{before(si) + li + 1}</span>
+								<Area
+									label="Step {li + 1}"
+									hideLabel
+									name="stepLine"
+									rows={2}
+									bind:value={line.text}
+									data-line={line.id}
+									placeholder={li === 0 && si === 0 ? 'Describe the first step' : ''}
+								/>
+								{#if section.lines.length > 1}
+									<Button variant="quiet" icon label="Remove step" onclick={() => removeLine(section, li)}>
+										<Icon name="x" size={18} />
+									</Button>
+								{/if}
+							</div>
 						{:else}
-							<div class="line-body">
-								<input
+							<div class="line-main">
+								<Field
+									label="Ingredient line"
+									hideLabel
 									name="ingredientLine"
 									bind:value={line.text}
 									data-line={line.id}
-									onkeydown={(e) => onEnter(e, section, li)}
-									aria-label="Ingredient line"
+									onkeydown={(e: KeyboardEvent) => onEnter(e, section, li)}
 									placeholder={examples[li % examples.length]}
 									autocomplete="off"
 								/>
-								{#if line.text.trim()}
-									{@const parsed = parseIngredient(line.text)}
-									<div class="parse-wrap" transition:slide={collapse()}>
-										<p class="parse" role="group" aria-label="Parsed ingredient">
-											{#if parsed.quantity !== null}
-												<span class="tok q tnum" data-part="quantity" in:pop>{amount(parsed.quantity)}</span>
-											{/if}
-											{#if parsed.unit}<span class="tok u" data-part="unit" in:pop>{parsed.unit}</span>{/if}
-											{#if parsed.name}<span class="name" data-part="name">{parsed.name}</span>{/if}
-											{#if parsed.note}<span class="note" data-part="note">{parsed.note}</span>{/if}
-											{#if parsed.quantity === null}<span class="note" data-part="no-amount">no amount</span>{/if}
-										</p>
-									</div>
+								{#if section.lines.length > 1}
+									<Button variant="quiet" icon label="Remove line" onclick={() => removeLine(section, li)}>
+										<Icon name="x" size={18} />
+									</Button>
 								{/if}
 							</div>
-						{/if}
-						{#if section.lines.length > 1}
-							<IconButton
-								icon="x"
-								label="Remove {steps ? 'step' : 'line'}"
-								variant="plain"
-								onclick={() => removeLine(section, li)}
-							/>
+							{#if line.text.trim()}
+								{@const parsed = parseIngredient(line.text)}
+								<div class="parse-wrap" in:arrive>
+									<p class="parse" role="group" aria-label="Parsed ingredient">
+										{#if parsed.quantity !== null}
+											<span class="tok q" data-part="quantity" in:pop>{amount(parsed.quantity)}</span>
+										{/if}
+										{#if parsed.unit}<span class="tok u" data-part="unit" in:pop>{parsed.unit}</span>{/if}
+										{#if parsed.name}<span class="name" data-part="name">{parsed.name}</span>{/if}
+										{#if parsed.note}<span class="note" data-part="note">{parsed.note}</span>{/if}
+										{#if parsed.quantity === null}<span class="note" data-part="no-amount">no amount</span>{/if}
+									</p>
+								</div>
+							{/if}
 						{/if}
 					</li>
 				{/each}
 			</ol>
 
-			<Button variant="ghost" arrow={false} icon="plus" onclick={() => addLine(section)}>
-				{steps ? 'Add step' : 'Add line'}
+			<Button size="s" class="add" onclick={() => addLine(section)}>
+				<Icon name="plus" size={16} />{steps ? 'Add step' : 'Add line'}
 			</Button>
 		</div>
 	{/each}
 
-	<Button variant="secondary" arrow={false} icon="plus" onclick={addSection}>
-		Add {steps ? 'step' : 'ingredient'} section
+	<Button class="add" onclick={addSection}>
+		<Icon name="plus" size={16} />Add {steps ? 'step' : 'ingredient'} section
 	</Button>
 </div>
 
 <style>
 	.editor {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--s-4);
-	}
-
-	.section {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--s-2);
-		inline-size: 100%;
-	}
-
-	.section-head {
-		display: flex;
-		align-items: center;
-		gap: var(--s-2);
-		inline-size: 100%;
-	}
-
-	.lines {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-2);
-		inline-size: 100%;
-	}
-
-	.line {
-		display: flex;
-		align-items: flex-start;
-		gap: var(--s-2);
-	}
-
-	.line-body {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		flex: 1;
+		display: grid;
+		gap: var(--space-3);
 		min-inline-size: 0;
 	}
-
+	.editor :global(.add) {
+		justify-self: start;
+	}
+	.section {
+		display: grid;
+		gap: var(--space-3);
+		padding: var(--space-3);
+		border-radius: var(--radius-panel);
+		background: var(--surface-sunken);
+		min-inline-size: 0;
+	}
+	.section-head,
+	.line-main {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		min-inline-size: 0;
+	}
+	.section-head > :global(.field),
+	.line-main > :global(.field) {
+		flex: 1;
+	}
+	.section-head > :global(.btn),
+	.line-main > :global(.btn) {
+		flex: none;
+	}
+	.lines {
+		display: grid;
+		gap: var(--space-3);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		min-inline-size: 0;
+	}
+	.line {
+		display: grid;
+		gap: var(--space-1);
+		min-inline-size: 0;
+	}
+	.line-main.step {
+		align-items: flex-start;
+	}
+	.num {
+		flex: none;
+		inline-size: var(--space-6);
+		padding-block-start: var(--space-2-5);
+		font-family: var(--font-display);
+		font-weight: var(--weight-display);
+		font-size: var(--type-display-s-size);
+		line-height: 1;
+		color: var(--ink-secondary);
+		font-variant-numeric: var(--numeric-figures);
+	}
 	.parse {
 		display: flex;
 		align-items: center;
 		flex-wrap: wrap;
-		gap: 6px;
-		padding-inline-start: 4px;
-		font-size: 12px;
+		gap: var(--space-1-5);
+		padding-inline-start: var(--space-4);
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
 		color: var(--ink);
+		overflow-wrap: anywhere;
+		min-inline-size: 0;
 	}
-
 	.tok {
-		display: inline-block;
-		padding: 2px 8px;
-		border-radius: var(--r-pill);
-		font-weight: 600;
+		padding-inline: var(--space-2);
+		border-radius: var(--radius-pill);
+		background: var(--surface-tint-strong);
+		font-weight: var(--weight-semibold);
+		font-variant-numeric: var(--numeric-figures);
 	}
-
-	.q {
-		background: var(--olive-soft);
-		color: var(--olive);
-	}
-
 	.u {
-		background: var(--sand);
-		color: var(--ink);
+		background: var(--surface-tint);
 	}
-
 	.name {
-		font-weight: 500;
+		min-inline-size: 0;
+		overflow-wrap: anywhere;
 	}
-
 	.note {
-		font-style: italic;
-		color: var(--ink-2);
-	}
-
-	.steps .line {
-		display: grid;
-		grid-template-columns: 40px minmax(0, 1fr) auto;
-	}
-
-	.no {
-		padding-block-start: 10px;
-		font-family: var(--font-display);
-		font-size: 22px;
-		font-weight: 300;
-		color: var(--brick);
-	}
-
-	input,
-	textarea {
-		inline-size: 100%;
-		min-block-size: 46px;
-		padding: 11px 14px;
-		border-radius: var(--r-sm);
-		border: 1px solid var(--line);
-		background: var(--white);
-		font-size: 15px;
-		line-height: 1.45;
-	}
-
-	.line input {
-		min-block-size: 42px;
-		padding-block: 9px;
-	}
-
-	textarea {
-		resize: vertical;
-		field-sizing: content;
-	}
-
-	input::placeholder,
-	textarea::placeholder {
-		color: var(--ink-2);
-	}
-
-	input:focus-visible,
-	textarea:focus-visible {
-		border-color: var(--olive);
-		box-shadow: 0 0 0 3px var(--olive-wash);
-		border-radius: var(--r-sm);
-	}
-
-	.section-title {
-		flex: 1;
-		border-style: dashed;
-		background: transparent;
-		font-family: var(--font-display);
-		font-style: italic;
-		font-size: 18px;
-		color: var(--olive);
+		color: var(--ink-secondary);
+		overflow-wrap: anywhere;
 	}
 </style>

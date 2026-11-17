@@ -45,13 +45,14 @@ test('Scenario: Imported recipe reaches the list scaled and grouped', async ({ p
 	const preview = page.getByRole('region', { name: 'Recipe preview' });
 	await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Lemon tart');
 	await expect(page.getByLabel('Servings', { exact: true })).toHaveValue('6');
-	await preview.getByRole('button', { name: 'Save recipe' }).first().click();
+	await page.getByRole('button', { name: 'Save recipe' }).click();
 	await expect(page).toHaveURL(/\/recipes\/\d+$/);
 	const id = Number(new URL(page.url()).pathname.split('/').pop());
 	await expect(info(page).getByRole('heading', { level: 1 })).toHaveText('Lemon tart');
 
 	// edit it: a new title, two servings, one more lemon, and a tag
-	await info(page).getByRole('link', { name: 'Edit' }).click();
+	await page.getByRole('button', { name: 'More recipe actions' }).click();
+	await page.getByRole('menuitem', { name: 'Edit' }).click();
 	await expect(page).toHaveURL(`/recipes/${id}/edit`);
 	await page.locator('html[data-hydrated]').waitFor({ state: 'attached' });
 	await page.getByLabel('Title', { exact: true }).fill('Lemon curd tart');
@@ -105,7 +106,7 @@ test('Scenario: Imported recipe reaches the list scaled and grouped', async ({ p
 	// Home shows it today
 	await nav(page, 'Home');
 	await expect(page).toHaveURL('/');
-	const week = page.getByRole('region', { name: 'Today' }).getByRole('link', { name: /^This week/ });
+	const week = page.getByRole('main').getByRole('region', { name: 'This week' });
 	await expect(week.getByRole('listitem').filter({ hasText: 'Wed' })).toContainText('Lemon curd tart');
 
 	// the plan has it with four servings

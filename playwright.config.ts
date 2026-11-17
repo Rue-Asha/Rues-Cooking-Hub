@@ -15,6 +15,8 @@ export default defineConfig({
 	projects: [
 		{
 			name: 'phone',
+			// a11y-floor sets its own viewports and pointers, once
+			testIgnore: /a11y-floor/,
 			use: { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }
 		},
 		{

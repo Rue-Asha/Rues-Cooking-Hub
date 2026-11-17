@@ -67,3 +67,19 @@ test('Navigation inside one area skips the page transition', async ({ page }) =>
 	await expect(page).toHaveURL('/recipes?sort=title');
 	expect(await transitions(page)).toBe(0);
 });
+
+// a bar that scrolls away would drop in from where it was scrolled to; only the sticky capsule sits out the page fade
+test('the top bar sits out the page fade only where it is sticky', async ({ page }, info) => {
+	test.skip(info.project.name !== 'desktop', 'sets its own viewports');
+	const named = (selector: string) => page.locator(selector).evaluate((el) => getComputedStyle(el).viewTransitionName);
+	for (const [width, top, strip] of [
+		[375, 'none', 'none'],
+		[1024, 'none', 'none'],
+		[1280, 'app-topbar', 'none']
+	] as const) {
+		await page.setViewportSize({ width, height: 800 });
+		await open(page, '/');
+		expect(await named('header[data-bar="top"]'), `${width} top bar`).toBe(top);
+		expect(await named('header[data-bar="strip"]'), `${width} strip`).toBe(strip);
+	}
+});

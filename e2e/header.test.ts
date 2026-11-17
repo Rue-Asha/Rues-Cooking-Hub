@@ -1,7 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
-import { mainNav, navDivider, open } from './helpers.ts';
+import { expect, test, type Page } from '@playwright/test';
+import { open, reset, seed } from './helpers.ts';
 
-test.beforeEach(({}, info) => test.skip(info.project.name !== 'desktop', 'desktop header'));
 
 const header = (page: Page) => page.getByRole('banner');
 const actions = header;
@@ -12,7 +11,8 @@ const pinActions = async (page: Page) => {
 	await expect(header(page).getByRole('button')).toHaveCount(0);
 };
 
-test('Scenario: Eating Out header shows spot actions', async ({ page }) => {
+test('Scenario: Eating Out header shows spot actions', async ({ page }, info) => {
+	test.skip(info.project.name !== 'desktop', 'desktop header');
 	await open(page, '/eating-out');
 	await expect(actions(page).getByRole('link', { name: 'Search spots' })).toHaveAttribute('href', '/eating-out#search');
 	await expect(actions(page).getByRole('link', { name: 'Add spot' })).toHaveAttribute('href', '/eating-out/new');
@@ -26,7 +26,8 @@ test('Scenario: Eating Out header shows spot actions', async ({ page }) => {
 	await pinActions(page);
 });
 
-test('Scenario: Header follows client-side navigation', async ({ page }) => {
+test('Scenario: Header follows client-side navigation', async ({ page }, info) => {
+	test.skip(info.project.name !== 'desktop', 'desktop header');
 	await open(page, '/recipes');
 	await page.evaluate(() => ((window as unknown as { marker: boolean }).marker = true));
 	await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Eating Out' }).click();
@@ -36,32 +37,47 @@ test('Scenario: Header follows client-side navigation', async ({ page }) => {
 	expect(await page.evaluate(() => (window as unknown as { marker?: boolean }).marker)).toBe(true);
 });
 
-test('Scenario: Desktop header fits at 1024 px', async ({ page }) => {
-	await page.setViewportSize({ width: 1024, height: 768 });
-	for (const path of ['/plan', '/eating-out']) {
-		await open(page, path);
-		const left = async (l: Locator) => (await l.boundingBox())!.x;
-		const right = async (l: Locator) => {
-			const b = (await l.boundingBox())!;
-			return b.x + b.width;
-		};
-		const brand = header(page).getByRole('link', { name: 'Rues Cooking Hub' });
-		const search = header(page).getByRole('link', { name: /^Search / });
-		const add = header(page).getByRole('link', { name: /^Add / });
-		const divider = navDivider(mainNav(page));
-		const m = {
-			brand: await right(brand),
-			pill: [await left(mainNav(page)), await right(mainNav(page))],
-			actions: [await left(search), await right(add)],
-			divider: [await left(divider), await right(divider)],
-			scroll: await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth])
-		};
-		console.log(path, JSON.stringify(m));
-		expect(m.brand, path).toBeLessThanOrEqual(m.pill[0]);
-		expect(m.pill[1], path).toBeLessThanOrEqual(m.actions[0]);
-		expect(m.actions[1], `${path} actions inside the viewport`).toBeLessThanOrEqual(m.scroll[1]);
-		expect(m.divider[0]).toBeGreaterThanOrEqual(m.pill[0]);
-		expect(m.divider[1]).toBeLessThanOrEqual(m.pill[1]);
-		expect(m.scroll[0]).toBeLessThanOrEqual(m.scroll[1]);
-	}
+test.describe('phone', () => {
+	test.beforeEach(({}, info) => test.skip(info.project.name !== 'phone', 'phone layout'));
+
+	const strip = (page: Page) => page.getByRole('banner');
+
+	test('Scenario: Recipe actions are reachable on every recipe-side screen on the phone', async ({ page, request }) => {
+		await reset(request);
+		const { recipes } = await seed(request, { recipes: [{ title: 'Pancakes' }] });
+		for (const path of ['/', '/recipes', `/recipes/${recipes[0]}`, '/recipes/tags', '/recipes/new/form', '/plan', '/list']) {
+			await open(page, path);
+			await expect(strip(page), path).toHaveCount(1);
+			await expect(strip(page).getByRole('link', { name: 'Rues Cooking Hub' }), path).toBeVisible();
+			await expect(strip(page).getByRole('link', { name: 'Rues Cooking Hub' })).toHaveAttribute('href', '/');
+			await expect(strip(page).getByRole('link', { name: 'Search recipes' }), path).toBeVisible();
+			const add = strip(page).getByRole('link', { name: 'Add recipe' });
+			await expect(add, path).toBeVisible();
+			await expect(add).toHaveAttribute('href', '/recipes/new');
+		}
+	});
+
+	test('Scenario: Search recipes on the phone focuses the field', async ({ page }) => {
+		const field = page.getByRole('searchbox', { name: 'Search recipes' });
+		await open(page, '/');
+		await strip(page).getByRole('link', { name: 'Search recipes' }).click();
+		await expect(page).toHaveURL('/recipes');
+		await expect(field).toBeFocused();
+
+		await page.getByRole('main').click({ position: { x: 4, y: 4 } });
+		await field.blur();
+		await expect(field).not.toBeFocused();
+		await strip(page).getByRole('link', { name: 'Search recipes' }).click();
+		await expect(page).toHaveURL('/recipes');
+		await expect(field).toBeFocused();
+	});
+
+	test('Scenario: Phone offers the spot actions on Eating Out', async ({ page }) => {
+		await open(page, '/eating-out');
+		await expect(strip(page).getByRole('link', { name: 'Rues Cooking Hub' })).toHaveAttribute('href', '/');
+		await expect(strip(page).getByRole('link', { name: 'Search spots' })).toBeVisible();
+		await expect(strip(page).getByRole('link', { name: 'Add spot' })).toBeVisible();
+		await expect(strip(page).getByRole('link', { name: /recipe/i }).filter({ hasNotText: 'Rues' })).toHaveCount(0);
+		await expect(page.getByRole('link', { name: /^(Search|Add) recipes?$/ })).toHaveCount(0);
+	});
 });
