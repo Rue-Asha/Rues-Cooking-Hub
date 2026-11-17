@@ -225,6 +225,8 @@ test('Scenario: Every dialog traps focus and returns it', async ({ page, request
 });
 
 test('Scenario: Close control and outside click close every dialog', async ({ page, request }) => {
+	// eleven dialogs opened twice, each on a fresh page load: about 20 s on a fast machine, past 30 s on the CI host
+	test.setTimeout(90_000);
 	for (const entry of dialogs.filter((d) => d.modal !== 'alertdialog')) {
 		await reset(request);
 		await entry.show(page, request);
