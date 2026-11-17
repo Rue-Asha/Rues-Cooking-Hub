@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { beforeNavigate } from '$app/navigation';
 	import { untrack } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import Button from '#lib/components/button/Button.svelte';
@@ -45,6 +46,11 @@
 			onquery({ ...query, q }, true);
 		}, 200);
 	}
+
+	// a search still waiting when the user leaves would navigate back here and cut that navigation short
+	beforeNavigate(({ from, to }) => {
+		if (to?.url.pathname !== from?.url.pathname) clearTimeout(timer);
+	});
 
 	const lang = (text: string) => (/[^\u0000-ɏ]/.test(text) ? 'und' : undefined);
 </script>

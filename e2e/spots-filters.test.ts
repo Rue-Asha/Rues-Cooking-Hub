@@ -62,6 +62,26 @@ test('Scenario: Search from Eating Out', async ({ page, request }) => {
 	await expect.poll(() => params(page).get('q')).toBe('müller');
 });
 
+test('Scenario: Opening a spot while the search is still pending stays on the spot', async ({ page, request }) => {
+	await reset(request);
+	const { spots } = await seed(request, { spots: [{ name: 'Ramen Bar' }] });
+	await open(page, '/eating-out');
+	// the spot loads slower than the search waits, so the search comes due while the spot is on its way
+	await page.route(`**/eating-out/${spots[0]}/__data.json*`, async (route) => {
+		await new Promise((done) => setTimeout(done, 500));
+		await route.continue();
+	});
+
+	await search(page).fill('Ramen');
+	// a quick tap lands while the list is still moving; Playwright would otherwise wait for it to settle
+	await page.getByRole('link', { name: 'Ramen Bar' }).click({ force: true });
+
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ramen Bar');
+	await page.waitForTimeout(500);
+	expect(new URL(page.url()).pathname).toBe(`/eating-out/${spots[0]}`);
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ramen Bar');
+});
+
 test('Scenario: No spot match offers to clear filters', async ({ page, request }) => {
 	await reset(request);
 	await seed(request, {
@@ -151,6 +171,8 @@ test('Scenario: Spot search keeps its placeholder whole at every width', async (
 		await page.setViewportSize({ width, height: 800 });
 		await open(page, '/eating-out');
 		await expect(page.getByLabel('City')).toBeVisible();
+		// the list card rises in on a full load; the three boxes are measured one after another, so it must have landed
+		await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'));
 		const { text, room } = await placeholderRoom(search(page));
 		expect(text, `${width}`).toBeLessThanOrEqual(room);
 		if (width < 768) continue;

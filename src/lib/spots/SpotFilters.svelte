@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, beforeNavigate } from '$app/navigation';
 	import { onMount, untrack, type Snippet } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import { flipOptions } from '#lib/motion.ts';
@@ -49,6 +49,11 @@
 			onquery({ ...query, q }, true);
 		}, 200);
 	}
+
+	// a search still waiting when the user leaves would navigate back here and cut that navigation short
+	beforeNavigate(({ from, to }) => {
+		if (to?.url.pathname !== from?.url.pathname) clearTimeout(timer);
+	});
 
 	function toggleTag(id: number) {
 		const tagIds = query.tagIds.includes(id) ? query.tagIds.filter((t) => t !== id) : [...query.tagIds, id];
