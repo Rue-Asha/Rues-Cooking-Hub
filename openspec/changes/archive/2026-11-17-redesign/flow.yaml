@@ -1,0 +1,11 @@
+track: feature
+triage: 'feature — from-scratch UI redesign of Rue''s Cooking Hub on fingerprint 1.0.0 (ecosystem-ui-revamp gates 3–8). Appetite: several sessions, in phases (gate 4 wireframes, gate 5 hi-fi, then the build in waves).'
+base: main
+gate0: '2026-11-15'
+gate1: '2026-11-15'
+gate2: '2026-11-17'
+learnings:
+  - 'Gate 1 (Cooking redesign): Rue left planner addition P1 (slop-baseline filter) unticked in a multi-select, then kept it when asked with the consequence; ask build-blocking additions as their own yes/no question, not inside a multi-select.'
+  - "a size rule keyed on DOM content (`:not(:has(img))`) can move a button between mousedown and mouseup when blur inserts the content, so the click never fires; key layout on state that changes before the press (fixer, redesign gate 7)"
+  - "FLIP measured in the viewport glides every row by the scroll clamp when a page gets shorter at its end; measure on the page and FLIP one level only (fixer, redesign gate 7)"
+  - "gate-7 polish passes in three apps each read Rue's 'chrome text must not select' differently; state the family rule verbatim in every app's brief (orchestrator, redesign gate 7)"

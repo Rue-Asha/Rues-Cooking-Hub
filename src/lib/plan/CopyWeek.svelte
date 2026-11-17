@@ -4,8 +4,7 @@
 	import { COPY } from '#lib/copy.ts';
 	import { reducedMotion, rise } from '#lib/motion.ts';
 	import type { IsoDate } from '#lib/types.ts';
-	import ArrowButton from '#lib/ui/ArrowButton.svelte';
-	import Button from '#lib/ui/Button.svelte';
+	import Button from '#lib/components/button/Button.svelte';
 	import Sheet from './Sheet.svelte';
 	import { weekRange } from './Week.svelte';
 
@@ -71,17 +70,19 @@
 
 		<div class="source">
 			<div class="stepper">
-				<ArrowButton variant="outline" direction="left" label="Earlier week" disabled={at >= sources.length - 1} onclick={() => step(1)} />
+				<Button variant="secondary" size="s" icon label="Earlier week" disabled={at >= sources.length - 1} onclick={() => step(1)}>
+					<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+				</Button>
 				{#key source.monday}
 					<div class="range" in:fly={{ x: reducedMotion() ? 0 : -direction * 18, duration: reducedMotion() ? 0 : 240 }}>
 						<span class="from">Copy from</span>
-						<strong class="tnum">{weekRange(source.monday, today)}</strong>
+						<strong class="figures">{weekRange(source.monday, today)}</strong>
 						<span class="count">{source.count === 0 ? 'No entries in this week' : plural(source.count)}</span>
 					</div>
 				{/key}
-				<ArrowButton variant="dark" label="Later week" disabled={at === 0} onclick={() => step(-1)} />
+				<Button variant="secondary" size="s" icon arrow label="Later week" disabled={at === 0} onclick={() => step(-1)} />
 			</div>
-			<p class="into">into <strong class="tnum">{weekRange(monday, today)}</strong></p>
+			<p class="into">into <strong class="figures">{weekRange(monday, today)}</strong></p>
 		</div>
 
 		{#if confirming}
@@ -93,15 +94,15 @@
 		{/if}
 
 		<div class="foot">
-			<Button variant="secondary" arrow={false} onclick={() => (confirming ? (confirming = false) : onclose())}>
+			<Button variant="quiet" onclick={() => (confirming ? (confirming = false) : onclose())}>
 				{confirming ? 'Back' : 'Cancel'}
 			</Button>
 			{#if confirming}
-				<Button type="submit" disabled={submitting}>Add anyway</Button>
+				<Button type="submit" variant="primary" disabled={submitting}>Add anyway</Button>
 			{:else if existing > 0 && source.count > 0}
-				<Button onclick={() => (confirming = true)}>Copy {plural(source.count)}</Button>
+				<Button variant="primary" onclick={() => (confirming = true)}>Copy {plural(source.count)}</Button>
 			{:else}
-				<Button type="submit" disabled={submitting}>{source.count > 0 ? `Copy ${plural(source.count)}` : 'Copy'}</Button>
+				<Button type="submit" variant="primary" disabled={submitting}>{source.count > 0 ? `Copy ${plural(source.count)}` : 'Copy'}</Button>
 			{/if}
 		</div>
 	</form>
@@ -111,18 +112,18 @@
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-5);
+		gap: var(--space-5);
 	}
 
 	.stepper {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: var(--s-3);
-		padding: var(--s-3);
-		border-radius: var(--r-card);
-		background: var(--white);
-		box-shadow: var(--shadow-card);
+		gap: var(--space-3);
+		padding: var(--space-3);
+		border-radius: var(--radius-panel);
+		background: var(--surface-raised);
+		box-shadow: var(--elevation-menu);
 		color: var(--ink);
 	}
 
@@ -135,60 +136,62 @@
 	}
 
 	.from {
-		font-size: var(--t-kicker);
-		font-weight: 500;
-		letter-spacing: var(--tracking-kicker);
+		font-size: var(--type-kicker-size);
+		line-height: var(--type-kicker-line);
+		font-weight: var(--type-kicker-weight);
+		letter-spacing: var(--type-kicker-tracking);
 		text-transform: uppercase;
-		color: var(--ink-2);
+		color: var(--ink-secondary);
 	}
 
 	.range strong {
-		font-family: var(--font-display);
-		font-size: 22px;
-		font-weight: 400;
-		line-height: 1.2;
+		font-size: var(--type-title-size);
+		line-height: var(--type-title-line);
+		font-weight: var(--type-title-weight);
 	}
 
 	.count {
-		font-size: 13px;
-		color: var(--ink-2);
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
+		color: var(--ink-secondary);
 	}
 
 	.into {
-		margin-block-start: var(--s-3);
+		margin-block-start: var(--space-3);
 		text-align: center;
-		color: var(--ink-2);
+		color: var(--ink-secondary);
 	}
 
 	.into strong {
 		color: var(--ink);
-		font-weight: 600;
+		font-weight: var(--weight-semibold);
 	}
 
 	.confirm,
 	.message {
-		padding: var(--s-3) var(--s-4);
-		border-radius: var(--r-sm);
-		font-size: 14px;
-		font-weight: 500;
+		padding: var(--space-3) var(--space-4);
+		border-radius: var(--radius-item);
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		font-weight: var(--type-label-weight);
 	}
 
 	.confirm {
-		background: var(--olive-soft);
-		color: var(--olive);
+		background: var(--surface-selected);
+		color: var(--accent-text);
 	}
 
 	.message {
-		background: var(--brick-soft);
-		color: var(--brick);
+		background: var(--danger-soft);
+		color: var(--danger);
 	}
 
 	.foot {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--s-3);
-		padding-block-start: var(--s-3);
-		border-block-start: 1px solid var(--line);
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: var(--space-2);
+		padding-block-start: var(--space-3);
+		box-shadow: var(--sheet-footer-rule);
 	}
 </style>

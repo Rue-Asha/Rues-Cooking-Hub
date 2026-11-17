@@ -172,6 +172,8 @@ test('swapping the image animates, and not under reduced motion', async ({ page 
 	expect(await running(page)).toBeGreaterThan(0);
 
 	await calm(page);
+	// the page's settle becomes a fade when the preference flips; let it finish before counting
+	await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a instanceof CSSTransition));
 	await page.getByRole('button', { name: 'Remove image' }).click();
 	await page.getByLabel('Photo file').setInputFiles(await jpeg('again.jpg'));
 	await expect(page.getByRole('presentation')).toBeVisible();

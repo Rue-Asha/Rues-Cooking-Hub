@@ -9,7 +9,8 @@ test('Scenario: Delete a spot from its page', async ({ page, request }) => {
 	const { spots } = await seed(request, { spots: [{ name: 'Gone soon', city: 'Bonn' }, { name: 'Stays' }] });
 	await open(page, `/eating-out/${spots[0]}`);
 
-	await page.getByRole('button', { name: 'Delete' }).click();
+	await page.getByRole('button', { name: 'More spot actions' }).click();
+	await page.getByRole('menuitem', { name: 'Delete spot' }).click();
 	const dialog = page.getByRole('dialog', { name: 'Delete “Gone soon”?' });
 	await expect(dialog).toBeVisible();
 	await dialog.getByRole('button', { name: 'Delete' }).click();

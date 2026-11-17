@@ -44,3 +44,12 @@ viewport or only uses `request` runs in one project (`test.skip(info.project.nam
 - **Svelte outro transitions on menus/forms/sheets** → set `aria-hidden` on `outrostart` (Svelte only sets `inert`) and run a new e2e file with `--repeat-each` before committing. (weil: plan-entries "Edit and delete an entry" failed 6/10 on phone from a strict-mode duplicate Save during a 160 ms outro) [2026-10-20 · build-cooking-hub]
 - **proof:full or a mockup/dev server run by hand** → always set `PORT` (free, check `ss -ltn`) and `COOKING_HUB_TEST=1` for `/__mockups/*` and `/__test/*`. (weil: 4173 and 5173 were held by another repo's server (Notes-Archive), proof:full hit it and Rue got a 500 on the mockups) [2026-11-03 · add-food-spots]
 - **Playwright `beforeEach` that needs `info`** → write `({}, info)`, not `(_, info)`. (weil: Playwright parses the destructuring form to pick fixtures and rejects `_`) [2026-11-03 · add-food-spots]
+- **Size or layout rule on a button keyed on DOM content (`:not(:has(img))`)** → key it on state that changes before the press. (weil: blur inserted the content between mousedown and mouseup, the button moved and the click never fired) [2026-11-17 · redesign]
+- **FLIP on a list whose page gets shorter at its end** → measure on the page (not the viewport) and FLIP one level only. (weil: viewport-measured FLIP glided every row by the scroll clamp) [2026-11-17 · redesign]
+
+## Design fingerprint
+
+- `DESIGN.md`, `DESIGN-reference.md`, `src/lib/styles/fingerprint/` and `scripts/fingerprint/` are vendored from Design-System and never edited here. `check-drift` in `proof` fails on any edit.
+- Fingerprint changes go to `Design-System/requests.md`, not into this repo.
+- Primitives are copied in with `Design-System/scripts/sync.sh <app-path> --primitive <name>`; the app owns them afterwards.
+- Styling uses fingerprint tokens only; `check-slop` enforces it and lists banned patterns in `scripts/fingerprint/banned.md`.

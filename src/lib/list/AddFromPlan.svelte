@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
-	import { cubicOut } from 'svelte/easing';
-	import type { TransitionConfig } from 'svelte/transition';
 	import { COPY } from '#lib/copy.ts';
 	import { addDays } from '#lib/dates.ts';
-	import { reducedMotion, rise } from '#lib/motion.ts';
+	import { rise } from '#lib/motion.ts';
+	import Sheet from '#lib/plan/Sheet.svelte';
 	import type { IsoDate } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
-	import Chip from '#lib/ui/Chip.svelte';
+	import Button from '#lib/components/button/Button.svelte';
 
 	let {
 		week,
@@ -18,8 +16,6 @@
 		onclose: () => void;
 		onadded: (count: number) => void;
 	} = $props();
-
-	const sheet = matchMedia('(max-width: 1023px)').matches;
 
 	/* svelte-ignore state_referenced_locally */
 	let from = $state(week.from);
@@ -33,32 +29,6 @@
 		{ label: 'Next week', from: addDays(week.from, 7), to: addDays(week.to, 7) }
 	]);
 
-	let dialog: HTMLElement;
-
-	$effect(() => {
-		const before = document.activeElement as HTMLElement | null;
-		dialog.querySelector<HTMLElement>('input')?.focus();
-		return () => before?.focus();
-	});
-
-	function onkeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			onclose();
-		} else if (event.key === 'Tab') {
-			const focusable = [...dialog.querySelectorAll<HTMLElement>('button, input')];
-			const first = focusable[0];
-			const last = focusable[focusable.length - 1];
-			if (event.shiftKey && document.activeElement === first) {
-				event.preventDefault();
-				last.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		}
-	}
-
 	const submit: SubmitFunction = () => {
 		busy = true;
 		message = null;
@@ -66,58 +36,29 @@
 			busy = false;
 			const plan = result.type === 'success' || result.type === 'failure' ? result.data?.plan : undefined;
 			if (plan?.kind === 'added') {
-				onadded(plan.count);
+				// update() hands the focus to <body>; closing after it lets the sheet give it back to its opener
 				await update({ reset: false });
+				onadded(plan.count);
 			} else message = plan?.kind === 'empty' ? COPY.nothingPlanned : 'Choose a start and an end date';
 		};
 	};
-
-	function enter(_node: Element): TransitionConfig {
-		if (reducedMotion()) return { duration: 120, css: (t) => `opacity: ${t}` };
-		if (sheet) return { duration: 360, easing: cubicOut, css: (_t, u) => `transform: translateY(${(u * 100).toFixed(2)}%)` };
-		return {
-			duration: 260,
-			easing: cubicOut,
-			css: (t, u) => `opacity: ${t}; transform: translateY(${(u * -8).toFixed(2)}px) scale(${(0.95 + 0.05 * t).toFixed(3)})`
-		};
-	}
-
-	function exit(_node: Element): TransitionConfig {
-		if (reducedMotion()) return { duration: 0 };
-		if (sheet) return { duration: 220, easing: cubicOut, css: (_t, u) => `transform: translateY(${(u * 100).toFixed(2)}%)` };
-		return { duration: 160, easing: cubicOut, css: (t) => `opacity: ${t}; transform: scale(${(0.97 + 0.03 * t).toFixed(3)})` };
-	}
-
-	const scrim = (_node: Element): TransitionConfig => ({ duration: reducedMotion() ? 0 : 200, css: (t) => `opacity: ${t}` });
 </script>
 
-<button type="button" class="scrim" class:sheet tabindex="-1" aria-hidden="true" onclick={onclose} transition:scrim></button>
-<div
-	class="dialog"
-	class:sheet
-	role="dialog"
-	tabindex="-1"
-	aria-modal="true"
-	aria-labelledby="plan-title"
-	bind:this={dialog}
-	in:enter
-	out:exit
-	{onkeydown}
->
-	<h2 id="plan-title">Add from plan</h2>
-	<p class="lead">Ingredients of every recipe planned in these days, scaled to their servings.</p>
+<Sheet open kicker="Shopping list" title="Add from plan" {onclose}>
 	<form method="POST" action="?/plan" use:enhance={submit}>
+		<p class="lead">Ingredients of every recipe planned in these days, scaled to their servings.</p>
 		<div class="ranges" role="group" aria-label="Quick ranges">
 			{#each ranges as r (r.label)}
-				<Chip
-					label={r.label}
-					active={from === r.from && to === r.to}
+				<button
+					type="button"
+					class="mode"
+					aria-pressed={from === r.from && to === r.to}
 					onclick={() => {
 						from = r.from;
 						to = r.to;
 						message = null;
-					}}
-				/>
+					}}>{r.label}</button
+				>
 			{/each}
 		</div>
 		<div class="dates">
@@ -132,122 +73,100 @@
 		</div>
 		{#if message}<p class="message" role="alert" transition:rise={{ y: 6 }}>{message}</p>{/if}
 		<div class="actions">
-			<Button variant="secondary" arrow={false} onclick={onclose}>Cancel</Button>
-			<Button variant="olive" type="submit" disabled={busy}>{busy ? 'Adding…' : 'Add to list'}</Button>
+			<Button variant="quiet" onclick={onclose}>Cancel</Button>
+			<Button variant="primary" type="submit" disabled={busy}>{busy ? 'Adding…' : 'Add to list'}</Button>
 		</div>
 	</form>
-</div>
+</Sheet>
 
 <style>
-	.scrim {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		padding: 0;
-		border: 0;
-		background: var(--veil);
-		cursor: default;
-	}
-
-	.scrim.sheet {
-		background: var(--veil-strong);
-	}
-
-	.dialog {
-		position: absolute;
-		inset-block-start: calc(100% + var(--s-3));
-		inset-inline-end: 0;
-		z-index: 61;
-		inline-size: 400px;
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-2);
-		padding: var(--s-6);
-		border-radius: var(--r-panel);
-		background: var(--surface);
-		box-shadow: var(--shadow-lift);
-		transform-origin: top right;
-	}
-
-	.dialog.sheet {
-		position: fixed;
-		inset: auto 0 0;
-		inline-size: auto;
-		padding-block-end: max(var(--s-6), env(safe-area-inset-bottom));
-		border-radius: var(--r-panel) var(--r-panel) 0 0;
-	}
-
-	h2 {
-		font-size: var(--t-display-3);
-	}
-
 	.lead {
-		font-size: 14px;
-		color: var(--ink-2);
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		color: var(--ink-secondary);
 	}
 
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-4);
-		margin-block-start: var(--s-3);
+		gap: var(--space-4);
 	}
 
 	.ranges {
 		display: flex;
 		flex-wrap: wrap;
-		gap: var(--s-2);
+		gap: var(--space-2);
+	}
+
+	.mode {
+		min-block-size: max(var(--control-height-s), var(--target));
+		padding-inline: var(--space-4);
+		border: 0;
+		border-radius: var(--radius-control);
+		background: var(--surface-control-solid);
+		box-shadow: var(--ring-control);
+		color: var(--ink);
+		font-size: var(--type-label-size);
+		line-height: var(--type-label-line);
+		font-weight: var(--type-label-weight);
+		transition:
+			background-color var(--motion-quick) var(--ease-out),
+			transform var(--motion-quick) var(--ease-out);
+	}
+
+	.mode:active {
+		transform: scale(0.97);
+	}
+
+	.mode[aria-pressed='true'] {
+		background: var(--surface-selected);
+		box-shadow: var(--ring-selected);
 	}
 
 	.dates {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--s-3);
+		grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+		gap: var(--space-3);
 	}
 
 	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
+		display: grid;
+		gap: var(--space-1-5);
 		min-inline-size: 0;
 	}
 
 	.field label {
-		font-size: var(--t-small);
-		font-weight: 600;
+		font-size: var(--type-label-size);
+		line-height: var(--type-label-line);
+		font-weight: var(--type-label-weight);
 	}
 
 	.field input {
 		inline-size: 100%;
-		min-block-size: 46px;
-		padding: 10px 12px;
-		border-radius: var(--r-sm);
-		border: 1px solid var(--line);
-		background: var(--white);
-		font-size: 15px;
-	}
-
-	.field input:focus-visible {
-		border-color: var(--olive);
-		border-radius: var(--r-sm);
+		min-block-size: max(var(--control-height), var(--target));
+		padding-inline: var(--space-4);
+		border: 0;
+		border-radius: var(--radius-control);
+		background: var(--surface-raised);
+		box-shadow: var(--ring-control);
+		font-size: var(--type-body-s-size);
+		font-variant-numeric: var(--numeric-figures);
 	}
 
 	.message {
-		padding: var(--s-3) var(--s-4);
-		border-radius: var(--r-sm);
-		background: var(--brick-wash);
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--brick);
+		padding: var(--space-3) var(--space-4);
+		border-radius: var(--radius-item);
+		background: var(--danger-soft);
+		color: var(--danger);
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		font-weight: var(--type-label-weight);
 	}
 
 	.actions {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: flex-end;
-		gap: var(--s-2);
-	}
-
-	.sheet .actions :global(.btn) {
-		flex: 1;
+		gap: var(--space-2);
 	}
 </style>

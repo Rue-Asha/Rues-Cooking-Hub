@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import Sheet from '#lib/plan/Sheet.svelte';
-	import Button from '#lib/ui/Button.svelte';
+	import Button from '#lib/components/button/Button.svelte';
 	import ScoreField from './ScoreField.svelte';
 
 	let { open, name, onclose }: { open: boolean; name: string; onclose: () => void } = $props();
@@ -34,8 +34,8 @@
 	<form method="POST" action="?/visit" use:enhance={submit}>
 		<ScoreField bind:value={score} {error} oninput={() => (error = '')} />
 		<div class="foot">
-			<Button variant="secondary" arrow={false} onclick={onclose}>Cancel</Button>
-			<Button type="submit" variant="olive" arrow={false} disabled={submitting}>Save</Button>
+			<Button variant="quiet" onclick={onclose}>Cancel</Button>
+			<Button type="submit" variant="primary" disabled={submitting}>Save</Button>
 		</div>
 	</form>
 </Sheet>
@@ -44,15 +44,13 @@
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-5);
+		gap: var(--space-5);
 	}
 
 	.foot {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--s-3);
-		padding-block-start: var(--s-3);
-		border-block-start: 1px solid var(--line);
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: var(--space-2);
 	}
 </style>

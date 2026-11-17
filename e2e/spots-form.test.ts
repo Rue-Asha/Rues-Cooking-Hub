@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
@@ -127,38 +126,15 @@ test('Scenario: Spot tag field suggests spot tags only', async ({ page, request 
 	await expect(suggestions.getByRole('button', { name: 'Baking', exact: true })).toHaveCount(0);
 });
 
-test('Scenario: Nav marks Eating Out on its sub-pages', async ({ page, request }) => {
+test('Scenario: Nav marks Eating Out on its sub-pages', async ({ page, request }, info) => {
 	const { spots } = await seed(request, { spots: [{ name: 'Sub page' }] });
 
 	for (const path of ['/eating-out/new', `/eating-out/${spots[0]}/edit`]) {
 		await open(page, path);
 		await expect(page.locator('[aria-current]')).toHaveCount(2);
-		await expect(page.locator('[aria-current="page"]').filter({ hasText: 'Eating Out' })).toHaveCount(2);
-		await expect(page.locator('[aria-current]').filter({ hasNotText: 'Eating Out' })).toHaveCount(0);
+		// the top bar names the area "Eating Out", the phone dock "Spots"; only one of the two is shown
+		await expect(page.locator('[aria-current="page"]').filter({ hasText: /^(Eating Out|Spots)$/ })).toHaveCount(2);
+		await expect(page.locator('[aria-current="page"]:visible')).toHaveCount(1);
+		await expect(mainNav(page).locator('[aria-current="page"]')).toHaveText(info.project.name === 'phone' ? 'Spots' : 'Eating Out');
 	}
-});
-
-test('Spot form screenshot', async ({ page }, info) => {
-	await open(page, '/eating-out/new');
-	await page.getByLabel('Name', { exact: true }).fill('Kuro Ramen');
-	await status(page, 'Visited').click();
-	await score(page).fill('8,75');
-	await price(page, '€€').click();
-	await page.getByLabel('City').fill('Berlin');
-	await page.getByLabel('Neighbourhood').fill('Kreuzberg');
-	await page.getByLabel('Photo file').setInputFiles(await jpeg());
-	await expect(page.getByRole('presentation')).toBeVisible();
-	await page.evaluate(async () => {
-		await Promise.all([...document.images].map((img) => img.decode().catch(() => undefined)));
-		await Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined)));
-		(document.activeElement as HTMLElement | null)?.blur();
-		window.scrollTo(0, 0);
-	});
-	// a full-page shot would leave the fixed phone tab bar half-way down the image; hide it
-	if (info.project.name === 'phone') await mainNav(page).evaluate((n) => (n.style.display = 'none'));
-
-	const path = `test-results/shots/eating-out-form-${info.project.name}.png`;
-	await page.screenshot({ path, fullPage: true, animations: 'disabled' });
-
-	expect(existsSync(path)).toBe(true);
 });

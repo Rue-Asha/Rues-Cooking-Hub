@@ -1,3 +1,5 @@
+import type { Area } from './nav.ts';
+
 export const COPY = {
 	titleRequired: 'Title is required',
 	servingsMin: 'Servings must be at least 1',
@@ -18,5 +20,26 @@ export const COPY = {
 	nameRequired: 'Name is required',
 	scoreRequired: 'Visited spots need a score',
 	scoreInvalid: 'Enter a score from 1.00 to 10.00, at most two decimals',
-	spotsNoMatch: 'No spots match'
+	spotsNoMatch: 'No spots match',
+	contextAdd: {
+		home: 'Add to your kitchen',
+		recipes: 'Add recipe',
+		plan: 'Add to plan',
+		list: 'Add an item',
+		'eating-out': 'Add spot'
+	} satisfies Record<Area, string>,
+	homeSheet: {
+		title: 'Add to your kitchen',
+		recipe: 'Recipe',
+		recipeHint: 'Paste a link or write one by hand',
+		plan: 'Plan entry',
+		planHint: 'Put a recipe or a note on a day',
+		list: 'List item',
+		listHint: 'Add a line to the shopping list'
+	},
+	phoneLabel: { spots: 'Spots' },
+	tagsShowFewer: 'Show fewer tags',
+	tagsEmpty: { title: 'No tags yet', body: 'Tags are added while you edit a recipe.' }
 } as const;
+
+export const tagsShowAll = (n: number | string): string => `Show all ${n} tags`;

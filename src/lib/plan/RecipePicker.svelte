@@ -1,13 +1,13 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import { flip } from 'svelte/animate';
 	import { COPY } from '#lib/copy.ts';
 	import { flipOptions, rise } from '#lib/motion.ts';
 	import { SLOTS, type IsoDate, type Slot } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
-	import Chip from '#lib/ui/Chip.svelte';
+	import Button from '#lib/components/button/Button.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
-	import ImagePlaceholder from '#lib/ui/ImagePlaceholder.svelte';
+	import { initialOf, plateOf } from '#lib/recipes/Picture.svelte';
 	import { matches, type PlanRecipe } from './RecipeRail.svelte';
 	import Sheet from './Sheet.svelte';
 
@@ -18,6 +18,9 @@
 	}: { target: { date: IsoDate; slot: Slot } | null; recipes: PlanRecipe[]; onclose: () => void } = $props();
 
 	// the sheet keeps its title while it animates out, after the parent has cleared the target
+	// a form posts to the page's own URL minus its query; the week stays in view only when it is named again
+	const keep = $derived(page.url.searchParams.has('week') ? `&week=${page.url.searchParams.get('week')}` : '');
+
 	let current = $state<{ date: IsoDate; slot: Slot } | null>(null);
 	let mode = $state<'recipe' | 'text'>('recipe');
 	let query = $state('');
@@ -77,21 +80,21 @@
 </script>
 
 <Sheet open={target !== null} kicker="Add to plan" title="{dayName} · {slotLabel}" label="Add to {dayName} {slotLabel}" {onclose}>
-	<form method="POST" action="?/add" use:enhance={submit}>
+	<form method="POST" action="?/add{keep}" use:enhance={submit}>
 		<input type="hidden" name="date" value={current?.date ?? ''} />
 		<input type="hidden" name="slot" value={current?.slot ?? ''} />
 		<input type="hidden" name="kind" value={mode} />
 		{#if selected && mode === 'recipe'}<input type="hidden" name="recipeId" value={selected.id} />{/if}
 
 		<div class="modes">
-			<Chip label="Recipe" active={mode === 'recipe'} onclick={() => setMode('recipe')} />
-			<Chip label="Free text" active={mode === 'text'} onclick={() => setMode('text')} />
+			<button type="button" class="mode" aria-pressed={mode === 'recipe'} onclick={() => setMode('recipe')}>Recipe</button>
+			<button type="button" class="mode" aria-pressed={mode === 'text'} onclick={() => setMode('text')}>Free text</button>
 		</div>
 
 		{#if mode === 'recipe'}
 			<label class="field">
 				<Icon name="search" size={16} />
-				<span class="visually-hidden">Search recipes</span>
+				<span class="sr-only">Search recipes</span>
 				<input type="search" placeholder="Search recipes" bind:value={query} use:focus />
 			</label>
 			<div class="results">
@@ -100,12 +103,14 @@
 						{#each shown as r (r.id)}
 							<li animate:flip={flipOptions()}>
 								<button type="button" class="row" class:picked={selected?.id === r.id} aria-pressed={selected?.id === r.id} onclick={() => pick(r)}>
-									<span class="thumb" aria-hidden="true">
-										{#if r.imageId !== null}<img src="/images/{r.imageId}" alt="" loading="lazy" />{:else}<ImagePlaceholder size="thumb" />{/if}
-									</span>
+									{#if r.imageId !== null}
+										<span class="pic" aria-hidden="true"><img src="/images/{r.imageId}" alt="" loading="lazy" /></span>
+									{:else}
+										<span class="pic thumb plate" data-plate={plateOf(r.title)} aria-hidden="true">{initialOf(r.title)}</span>
+									{/if}
 									<span class="text">
 										<span class="name">{r.title}</span>
-										<span class="meta tnum">{r.servings} servings{r.totalMinutes ? ` · ${r.totalMinutes} min` : ''}</span>
+										<span class="meta figures">{r.servings} servings{r.totalMinutes ? ` · ${r.totalMinutes} min` : ''}</span>
 									</span>
 									{#if selected?.id === r.id}<Icon name="check" size={18} />{/if}
 								</button>
@@ -133,7 +138,7 @@
 						<input type="number" name="servings" inputmode="numeric" bind:value={servings} />
 					</label>
 				{/if}
-				<Button type="submit" disabled={submitting}>Add to plan</Button>
+				<Button type="submit" variant="primary" disabled={submitting}>Add to plan</Button>
 			</div>
 		{/if}
 	</form>
@@ -143,30 +148,57 @@
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-4);
+		gap: var(--space-4);
 		flex: 1;
 		min-block-size: 0;
 	}
 
 	.modes {
 		display: flex;
-		gap: var(--s-2);
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+
+	.mode {
+		min-block-size: max(var(--control-height-s), var(--target));
+		padding-inline: var(--space-4);
+		border: 0;
+		border-radius: var(--radius-control);
+		background: var(--surface-control-solid);
+		box-shadow: var(--ring-control);
+		color: var(--ink);
+		font-size: var(--type-label-size);
+		line-height: var(--type-label-line);
+		font-weight: var(--type-label-weight);
+		transition:
+			background-color var(--motion-quick) var(--ease-out),
+			transform var(--motion-quick) var(--ease-out);
+	}
+
+	.mode:active {
+		transform: scale(0.97);
+	}
+
+	.mode[aria-pressed='true'] {
+		background: var(--surface-selected);
+		box-shadow: var(--ring-selected);
 	}
 
 	.field {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		min-block-size: 48px;
-		padding: 0 16px;
-		border-radius: var(--r-pill);
-		border: 1px solid var(--line);
-		background: var(--white);
-		color: var(--ink-2);
+		gap: var(--space-2);
+		min-block-size: max(var(--control-height), var(--target));
+		padding-inline: var(--space-4);
+		border-radius: var(--radius-control);
+		background: var(--surface-raised);
+		box-shadow: var(--ring-control);
+		color: var(--ink-secondary);
 	}
 
-	.field:focus-within {
-		box-shadow: var(--focus-ring);
+	.field:has(input:focus-visible) {
+		outline: var(--focus-width) solid var(--focus-ring);
+		outline-offset: var(--focus-offset);
 	}
 
 	.field input {
@@ -174,19 +206,22 @@
 		min-inline-size: 0;
 		border: 0;
 		background: none;
-		font-size: 16px;
+		font-size: var(--type-body-s-size);
 		color: var(--ink);
 	}
 
-	.field input:focus {
+	.field input:focus-visible {
 		outline: none;
-		box-shadow: none;
+	}
+
+	.text-field {
+		flex-wrap: wrap;
 	}
 
 	.text-field .label {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--ink-2);
+		font-size: var(--type-label-size);
+		font-weight: var(--type-label-weight);
+		color: var(--ink);
 	}
 
 	.results {
@@ -194,34 +229,37 @@
 		min-block-size: 120px;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-		margin-inline: -8px;
-		padding-inline: 8px;
+		margin-inline: calc(-1 * var(--space-2));
+		padding-inline: var(--space-2);
 	}
 
 	ul {
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: var(--space-1);
 	}
 
 	.row {
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: var(--space-3);
 		inline-size: 100%;
-		min-block-size: 56px;
-		padding: 6px 12px 6px 6px;
+		min-block-size: var(--space-14);
+		padding: var(--space-1-5) var(--space-3) var(--space-1-5) var(--space-1-5);
 		border: 0;
-		border-radius: var(--r-sm);
+		border-radius: var(--radius-item);
 		background: transparent;
+		color: var(--ink);
 		text-align: start;
 		transition:
-			background-color var(--d-fast) var(--ease-out),
-			transform var(--d-fast) var(--ease-out);
+			background-color var(--motion-quick) var(--ease-out),
+			transform var(--motion-quick) var(--ease-out);
 	}
 
-	.row:hover {
-		background: var(--ink-wash);
+	@media (hover: hover) {
+		.row:hover {
+			background: var(--surface-sunken);
+		}
 	}
 
 	.row:active {
@@ -229,19 +267,32 @@
 	}
 
 	.row.picked {
-		background: var(--olive-soft);
-		color: var(--olive);
+		background: var(--surface-selected);
+		box-shadow: var(--ring-selected);
 	}
 
-	.thumb {
+	.pic {
 		flex: none;
-		inline-size: 44px;
-		block-size: 44px;
-		border-radius: var(--r-pill);
+		inline-size: var(--space-10);
+		block-size: var(--space-10);
+		border-radius: var(--radius-round);
 		overflow: hidden;
 	}
 
-	.thumb img {
+	.pic.plate {
+		--thumb: var(--space-10);
+		box-shadow: var(--ring-hairline);
+	}
+
+	.plate[data-plate='1'] {
+		background: var(--surface-plate-1);
+	}
+
+	.plate[data-plate='2'] {
+		background: var(--surface-plate-2);
+	}
+
+	.pic img {
 		inline-size: 100%;
 		block-size: 100%;
 		object-fit: cover;
@@ -255,53 +306,56 @@
 	}
 
 	.name {
-		font-size: 15px;
-		font-weight: 600;
-		line-height: 1.25;
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		font-weight: var(--type-label-weight);
 		color: var(--ink);
 	}
 
 	.meta {
-		font-size: 13px;
-		color: var(--ink-2);
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
+		color: var(--ink-secondary);
 	}
 
 	.empty {
-		padding: var(--s-5) var(--s-2);
-		color: var(--ink-2);
+		padding: var(--space-5) var(--space-2);
+		color: var(--ink-secondary);
 	}
 
 	.error {
-		color: var(--brick);
-		font-size: 14px;
-		font-weight: 500;
+		color: var(--danger);
+		font-size: var(--type-body-s-size);
+		font-weight: var(--type-label-weight);
 	}
 
 	.foot {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
-		gap: var(--s-4);
-		padding-block-start: var(--s-3);
-		border-block-start: 1px solid var(--line);
+		gap: var(--space-4);
+		padding-block-start: var(--space-3);
+		box-shadow: var(--sheet-footer-rule);
 	}
 
 	.servings {
 		display: flex;
 		align-items: center;
-		gap: var(--s-3);
-		font-size: 14px;
-		font-weight: 500;
+		gap: var(--space-3);
+		font-size: var(--type-label-size);
+		font-weight: var(--type-label-weight);
 	}
 
 	.servings input {
-		inline-size: 72px;
-		min-block-size: 44px;
-		padding: 0 12px;
-		border: 1px solid var(--line);
-		border-radius: var(--r-pill);
-		background: var(--white);
-		font-size: 16px;
+		inline-size: var(--space-16);
+		min-block-size: max(var(--control-height), var(--target));
+		padding-inline: var(--space-3);
+		border: 0;
+		border-radius: var(--radius-control);
+		background: var(--surface-raised);
+		box-shadow: var(--ring-control);
+		font-size: var(--type-body-s-size);
 		text-align: center;
 	}
 </style>

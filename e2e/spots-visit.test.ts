@@ -45,7 +45,7 @@ test('Scenario: Invalid score keeps the sheet open', async ({ page, request }) =
 	await sheet(page).getByLabel('Score').fill('abc');
 	await sheet(page).getByRole('button', { name: 'Save' }).click();
 
-	await expect(sheet(page).getByRole('alert')).toHaveText('Enter a score from 1.00 to 10.00, at most two decimals');
+	await expect(sheet(page).getByLabel('Score')).toHaveAccessibleDescription('Enter a score from 1.00 to 10.00, at most two decimals');
 	await expect(sheet(page)).toBeVisible();
 	expect(stored(spots[0])).toEqual({ status: 'want', score: null });
 });

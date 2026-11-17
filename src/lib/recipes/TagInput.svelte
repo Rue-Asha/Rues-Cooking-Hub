@@ -4,7 +4,7 @@
 	import { flipOptions, pop, reducedMotion } from '#lib/motion.ts';
 	import { fold } from '#lib/text.ts';
 	import type { Tag } from '#lib/types.ts';
-	import Chip from '#lib/ui/Chip.svelte';
+	import Field from '#lib/components/field/Field.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 
 	// `selected` holds names; the typed-but-unconfirmed text is posted too (it is the `tag` input itself)
@@ -19,10 +19,10 @@
 	const suggestions = $derived.by(() => {
 		const q = fold(pending);
 		const taken = new Set(selected.map(fold));
-		return tags.filter((t) => !taken.has(fold(t.name)) && fold(t.name).includes(q)).slice(0, 12);
+		return tags.filter((t) => !taken.has(fold(t.name)) && fold(t.name).includes(q)).slice(0, 4);
 	});
 
-	let input: HTMLInputElement;
+	let root: HTMLElement;
 
 	function add(raw: string) {
 		const typed = raw.normalize('NFC').trim().replace(/\s+/g, ' ');
@@ -32,7 +32,7 @@
 
 	function remove(name: string) {
 		selected.splice(selected.indexOf(name), 1);
-		input.focus();
+		root.querySelector<HTMLInputElement>('input:not([type=hidden])')?.focus();
 	}
 
 	// a comma confirms what came before it, which also covers pasting "a, b, c"
@@ -56,45 +56,43 @@
 	const leave = () => ({ duration: reducedMotion() ? 0 : 140 });
 </script>
 
-<div class="field">
-	<label for="f-tag">Tags</label>
-	<ul class="box" aria-label="Selected tags">
-		{#each selected as name (fold(name))}
-			<li class="tag" class:fresh={isNew(name)} animate:flip={flipOptions()} in:pop out:fade={leave()}>
-				<input type="hidden" name="tag" value={name} />
-				{#if isNew(name)}<Icon name="sparkle" size={13} />{/if}
-				<span>{name}</span>
-				{#if isNew(name)}<span class="badge">new</span>{/if}
-				<button type="button" aria-label="Remove {name}" onclick={() => remove(name)}><Icon name="x" size={14} /></button>
-			</li>
-		{/each}
-		<li class="entry">
-			<input
-				id="f-tag"
-				bind:this={input}
-				name="tag"
-				bind:value={pending}
-				oninput={onInput}
-				onkeydown={onKeydown}
-				placeholder="Add a tag"
-				aria-label="Add a tag"
-				autocomplete="off"
-			/>
-		</li>
-	</ul>
+<div class="tags" bind:this={root}>
+	{#if selected.length > 0}
+		<ul class="chips" aria-label="Selected tags">
+			{#each selected as name (fold(name))}
+				<li class="chip" animate:flip={flipOptions()} in:pop out:fade={leave()}>
+					<input type="hidden" name="tag" value={name} />
+					<span class="t">{name}</span>
+					{#if isNew(name)}<span class="mark">new</span>{/if}
+					<button type="button" class="x" aria-label="Remove {name}" onclick={() => remove(name)}><Icon name="x" size={14} /></button>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+	<Field
+		label="Add a tag"
+		hideLabel
+		name="tag"
+		bind:value={pending}
+		oninput={onInput}
+		onkeydown={onKeydown}
+		placeholder="Add a tag"
+		autocomplete="off"
+		enterkeyhint="done"
+	/>
 	{#if suggestions.length > 0}
-		<div class="suggest" role="group" aria-label="Tag suggestions">
+		<div class="chips" role="group" aria-label="Tag suggestions">
 			{#each suggestions as tag (tag.id)}
 				<span animate:flip={flipOptions()} in:pop out:fade={leave()}>
-					<Chip
-						label={tag.name}
-						icon="plus"
-						size="sm"
+					<button
+						type="button"
+						class="chip suggest"
+						data-press
 						onclick={() => {
 							add(tag.name);
 							pending = '';
 						}}
-					/>
+					><Icon name="plus" size={14} /><span class="t">{tag.name}</span></button>
 				</span>
 			{/each}
 		</div>
@@ -102,100 +100,65 @@
 </div>
 
 <style>
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
+	.tags {
+		display: grid;
+		gap: var(--space-3);
 		min-inline-size: 0;
 	}
-
-	label {
-		font-size: var(--t-small);
-		font-weight: 600;
-	}
-
-	.box {
+	.chips {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--s-2);
-		padding: 6px;
-		border-radius: var(--r-md);
-		border: 1px solid var(--line);
-		background: var(--white);
-		transition: border-color var(--d-fast) var(--ease-out);
+		gap: var(--space-2);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		min-inline-size: 0;
 	}
-
-	.box:focus-within {
-		border-color: var(--olive);
-		box-shadow: 0 0 0 3px var(--olive-wash);
+	.chips > span {
+		display: contents;
 	}
-
-	.tag {
+	.chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
-		min-block-size: 40px;
-		padding: 0 4px 0 var(--s-4);
-		border-radius: var(--r-pill);
-		background: var(--olive);
-		color: var(--white);
-		font-size: 14px;
-		font-weight: 500;
-		white-space: nowrap;
+		gap: var(--space-1-5);
+		max-inline-size: 100%;
+		min-block-size: max(var(--control-height-xs), var(--target));
+		padding-inline: var(--space-3);
+		border-radius: var(--radius-pill);
+		background: var(--surface-tint);
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
 	}
-
-	.fresh {
-		background: transparent;
-		border: 1px dashed var(--brick);
-		color: var(--brick);
+	.t {
+		min-inline-size: 0;
+		overflow-wrap: anywhere;
+		text-align: start;
 	}
-
-	.badge {
-		font-size: 11px;
-		font-weight: 600;
-		letter-spacing: 0.06em;
+	.mark {
+		font-size: var(--type-overline-size);
+		letter-spacing: var(--type-overline-tracking);
+		font-weight: var(--type-overline-weight);
 		text-transform: uppercase;
+		color: var(--ink-secondary);
 	}
-
-	.tag button {
+	.x {
 		display: grid;
 		place-items: center;
-		inline-size: 32px;
-		block-size: 32px;
+		flex: none;
+		inline-size: var(--target);
+		block-size: var(--target);
+		margin-inline-end: calc(-1 * var(--space-2));
+		padding: 0;
 		border: 0;
-		border-radius: var(--r-pill);
-		background: transparent;
-		color: inherit;
-		opacity: 0.8;
-		transition: opacity var(--d-fast) var(--ease-out);
-	}
-
-	.tag button:hover {
-		opacity: 1;
-	}
-
-	.entry {
-		flex: 1;
-		min-inline-size: 110px;
-	}
-
-	.entry input {
-		inline-size: 100%;
-		min-block-size: 40px;
-		padding: 0 8px;
-		border: 0;
+		border-radius: var(--radius-round);
 		background: none;
-		font-size: 15px;
+		color: var(--ink);
 	}
-
-	.entry input:focus-visible {
-		box-shadow: none;
-	}
-
 	.suggest {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--s-2);
+		border: 0;
+		background: var(--surface-raised);
+		box-shadow: var(--ring-control);
+		color: var(--ink);
+		font-weight: var(--weight-medium);
 	}
 </style>

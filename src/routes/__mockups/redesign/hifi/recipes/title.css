@@ -1,0 +1,10 @@
+/* A long screen title steps down one role (DESIGN-reference.md, worst-case data): display-l, and the lead's width instead of 9em. */
+.screen-lead h1[data-long] {
+	max-inline-size: none;
+	font-size: var(--type-display-l-size);
+	line-height: var(--type-display-l-line);
+	letter-spacing: var(--type-display-l-tracking);
+	text-wrap: pretty;
+	overflow-wrap: anywhere;
+	hyphens: auto;
+}

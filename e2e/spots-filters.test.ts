@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { open, reset, seed } from './helpers.ts';
+import { open, placeholderRoom, reset, seed } from './helpers.ts';
 
 const cards = (page: Page) => page.getByRole('list', { name: 'Spots' }).getByRole('heading', { level: 3 });
 const segment = (page: Page, name: string | RegExp) => page.getByRole('group', { name: 'Status' }).getByRole('button', { name });
@@ -141,4 +141,29 @@ test('Scenario: Want to go offers no score sort', async ({ page, request }) => {
 	await segment(page, /^Want to go/).click();
 
 	await expect(page.getByLabel('Sort spots').getByRole('option')).toHaveText(['Newest first', 'Name A–Z']);
+});
+
+test('Scenario: Spot search keeps its placeholder whole at every width', async ({ page, request }, info) => {
+	test.skip(info.project.name !== 'desktop', 'sets its own viewports');
+	await reset(request);
+	await seed(request, { spots: [{ name: 'Alpha', status: 'visited', scoreHundredths: 875, city: 'Berlin' }] });
+	for (const width of [375, 768, 1024, 1280]) {
+		await page.setViewportSize({ width, height: 800 });
+		await open(page, '/eating-out');
+		await expect(page.getByLabel('City')).toBeVisible();
+		const { text, room } = await placeholderRoom(search(page));
+		expect(text, `${width}`).toBeLessThanOrEqual(room);
+		if (width < 768) continue;
+		const field = (await search(page).boundingBox())!;
+		const sort = (await page.getByLabel('Sort spots').boundingBox())!;
+		const city = (await page.getByLabel('City').boundingBox())!;
+		if (width < 1024) {
+			expect(field.y + field.height, `${width} search above the selects`).toBeLessThanOrEqual(sort.y);
+			expect(field.x, `${width} search starts in the sort column`).toBeLessThan(sort.x + sort.width);
+			expect(field.x + field.width, `${width} search runs on over the city column`).toBeGreaterThan(city.x);
+		} else {
+			expect(Math.abs(field.y + field.height - (sort.y + sort.height)), `${width} search beside the selects`).toBeLessThanOrEqual(2);
+			expect(field.x + field.width, `${width} search before the sort`).toBeLessThanOrEqual(sort.x);
+		}
+	}
 });

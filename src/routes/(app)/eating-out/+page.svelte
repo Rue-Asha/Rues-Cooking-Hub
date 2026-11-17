@@ -1,23 +1,24 @@
 <script lang="ts">
-	import { beforeNavigate, goto } from '$app/navigation';
-	import { untrack } from 'svelte';
-	import { flip } from 'svelte/animate';
-	import { cubicOut } from 'svelte/easing';
-	import type { TransitionConfig } from 'svelte/transition';
-	import { flipOptions, reducedMotion, rise, stagger } from '#lib/motion.ts';
-	import { hasSpotFilters, switchStatus, toSpotSearch } from '#lib/spots/query.ts';
-	import SpotFilters from '#lib/spots/SpotFilters.svelte';
+	import { goto } from '$app/navigation';
+	import Button from '#lib/components/button/Button.svelte';
+	import EmptyState from '#lib/components/empty-state/EmptyState.svelte';
 	import { COPY } from '#lib/copy.ts';
+	import { flipOnPage } from '#lib/motion.ts';
+	import { pill } from '#lib/shell/pill.ts';
+	import { useStage } from '#lib/shell/stage.svelte.ts';
+	import { switchStatus, toSpotSearch } from '#lib/spots/query.ts';
 	import SpotCard from '#lib/spots/SpotCard.svelte';
+	import SpotFilters from '#lib/spots/SpotFilters.svelte';
 	import type { SpotQuery, SpotStatus } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
-	import Icon from '#lib/ui/Icon.svelte';
-	import ImagePlaceholder from '#lib/ui/ImagePlaceholder.svelte';
-	import Kicker from '#lib/ui/Kicker.svelte';
 
 	let { data } = $props();
 
-	const places = (n: number) => (n === 1 ? '1 place' : `${n} places`);
+	const places = (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'place' : 'places'}`;
+	// the first listed spot with a photo is the stage
+	useStage(() => {
+		const id = data.spots.find((s) => s.imageId != null)?.imageId;
+		return id == null ? null : `/images/${id}`;
+	});
 	const total = $derived(data.totals.visited + data.totals.want);
 	const sides: { status: SpotStatus; label: string }[] = [
 		{ status: 'visited', label: 'Visited' },
@@ -27,28 +28,8 @@
 		data.query.status === 'visited' ? 'No visited spots yet.' : 'Nothing on your want-to-go list yet.'
 	);
 
-	// The first cards rise in through CSS, so the entrance plays before hydration; cards that arrive later use rise().
-	let intro = $state(true);
-	beforeNavigate(() => (intro = false));
-	// fixed per card: a delay that changed on reorder would push a finished entrance back into its delay
-	const introDelay = new Map(untrack(() => data.spots).map((s, i) => [s.id, stagger(i)]));
-
-	let arrivals = 0;
-	function arrival() {
-		if (arrivals++ === 0) queueMicrotask(() => (arrivals = 0));
-		return { delay: 160 + stagger(arrivals - 1), y: 20 };
-	}
-
-	// Svelte pins a leaving card with an inline translate before this runs; keep it or the card jumps to the grid's corner
-	function leave(node: Element): TransitionConfig {
-		if (reducedMotion()) return { duration: 0 };
-		const pinned = (node as HTMLElement).style.transform;
-		return {
-			duration: 220,
-			easing: cubicOut,
-			css: (t) => `transform: ${pinned} scale(${(0.92 + 0.08 * t).toFixed(3)}); opacity: ${t}`
-		};
-	}
+	// the page settles in on a full page load only, never on in-app navigation
+	const settle = typeof document === 'undefined' || !document.documentElement.hasAttribute('data-hydrated');
 
 	function clear() {
 		navigate({ ...data.query, q: '', tagIds: [], city: null, price: null });
@@ -63,84 +44,76 @@
 	<title>Eating Out · Rues Cooking Hub</title>
 </svelte:head>
 
-<div class="column page" data-column>
-	<header class="head">
-		<div data-page-header>
-			<Kicker parts={total > 0 ? ['Spots', places(total)] : ['Spots']} />
-			<h1>Eating <em>Out</em></h1>
+<header class="screen-head">
+	<div class="screen-lead">
+		<ul class="kicker">
+			<li>Spots</li>
+			{#if total > 0}<li>{places(total)}</li>{/if}
+		</ul>
+		<h1>Eating <em class="accent-word">Out</em></h1>
+		<p class="lede">The places you loved, and the ones you still want to try.</p>
+		<div class="lead-actions">
+			<Button variant="primary" arrow href="/eating-out/new">Add spot</Button>
 		</div>
-		{#if total > 0}
-			<div class="head-side">
-				<p>
-					{places(data.totals.visited)} visited, {data.totals.want} still on the want-to-go list.
-				</p>
-				<Button href="/eating-out/new" variant="olive" class="add">Add spot</Button>
-			</div>
-		{/if}
-	</header>
+	</div>
+	{#if total > 0}
+		<ul class="screen-facts" data-surface="inverse" aria-label="Spot totals">
+			<li><span class="n">{data.totals.visited.toLocaleString('en-GB')}</span>Visited</li>
+			<li><span class="n">{data.totals.want.toLocaleString('en-GB')}</span>Want to go</li>
+		</ul>
+	{/if}
+</header>
 
+{#snippet segment()}
+	<div class="seg-host">
+		<div class="segment" role="group" aria-label="Status" data-pill use:pill>
+			{#each sides as side (side.status)}
+				<button
+					type="button"
+					aria-pressed={data.query.status === side.status}
+					onclick={() => navigate(switchStatus(data.query, side.status, data.explicitSort))}
+				>
+					{side.label}
+					<span class="n">{data.counts[side.status]}</span>
+				</button>
+			{/each}
+		</div>
+	</div>
+{/snippet}
+
+<div class="screen-body" data-settle={settle ? '' : undefined}>
 	{#if total === 0}
-		<section class="empty" aria-labelledby="empty-title">
-			<div class="empty-text">
-				<h2 id="empty-title" data-section-heading>Start your list</h2>
-				<p>Keep the places you loved, and the ones you still want to try.</p>
-				<Button href="/eating-out/new">Add spot</Button>
-			</div>
-			<div class="empty-art"><ImagePlaceholder size="hero" label="Your first spot goes here" /></div>
-		</section>
+		<EmptyState title="Start your list" body="Keep the places you loved, and the ones you still want to try.">
+			{#snippet action()}<Button variant="primary" arrow href="/eating-out/new">Add spot</Button>{/snippet}
+		</EmptyState>
 	{:else}
-		<section class="list" aria-label="Eating Out list">
-			{#snippet segment()}
-				<div class="segment" role="group" aria-label="Status">
-					{#each sides as side (side.status)}
-						<button
-							type="button"
-							aria-pressed={data.query.status === side.status}
-							class:on={data.query.status === side.status}
-							onclick={() => navigate(switchStatus(data.query, side.status, data.explicitSort))}
-						>
-							{side.label}
-							<span class="n tnum">{data.counts[side.status]}</span>
-						</button>
-					{/each}
-				</div>
-			{/snippet}
+		<section class="card all" data-surface="solid" aria-label="Eating Out list">
+			<div class="card-head">
+				<h2>Your spots</h2>
+				<span class="card-note" role="status">{places(data.spots.length)}</span>
+			</div>
 
 			{#if data.totals[data.query.status] === 0}
-				<div class="controls">{@render segment()}</div>
-				<div class="side-empty" in:rise={{ delay: 120 }}>
-					<p>{emptySide}</p>
-					<Button href="/eating-out/new" variant="secondary" arrow={false}>Add spot</Button>
+				{@render segment()}
+				<div class="none">
+					<p class="none-title">{emptySide}</p>
+					<Button href="/eating-out/new">Add spot</Button>
 				</div>
 			{:else}
 				<SpotFilters facets={data.facets} query={data.query} onquery={navigate} {segment} />
 				{#if data.spots.length === 0}
-					<div class="no-match" in:rise={{ delay: 120 }}>
-						<p class="no-match-title">{COPY.spotsNoMatch}</p>
+					<div class="none">
+						<h3 class="none-title">{COPY.spotsNoMatch}</h3>
 						<p>Try fewer tags or a different word.</p>
-						<Button variant="secondary" arrow={false} onclick={clear}>Clear filters</Button>
+						<Button onclick={clear}>Clear filters</Button>
 					</div>
 				{:else}
-					<ul class="grid" class:intro aria-label="Spots">
+					<ul class="list" aria-label="Spots">
 						{#each data.spots as spot (spot.id)}
-							<li
-								style:--delay="{introDelay.get(spot.id) ?? 0}ms"
-								animate:flip={flipOptions()}
-								in:rise={arrival()}
-								out:leave
-							>
+							<li animate:flipOnPage>
 								<SpotCard {spot} />
 							</li>
 						{/each}
-						{#if data.query.status === 'want' && !hasSpotFilters(data.query)}
-							<li class="tile-slot">
-								<a class="add-tile" href="/eating-out/new">
-									<span class="plus"><Icon name="plus" size={22} /></span>
-									<span class="add-title">Add a place</span>
-									<span class="add-sub">A tip from a friend, a corner you walked past</span>
-								</a>
-							</li>
-						{/if}
 					</ul>
 				{/if}
 			{/if}
@@ -149,297 +122,90 @@
 </div>
 
 <style>
-	.page {
+	.lead-actions {
 		display: flex;
-		flex-direction: column;
-		gap: var(--s-8);
+		flex-wrap: wrap;
+		gap: var(--space-2);
+		margin-block-start: var(--space-1);
 	}
-
-	.head {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: var(--s-6);
+	.all {
+		display: grid;
+		gap: var(--space-4);
+		padding: var(--space-5);
+		min-inline-size: 0;
 	}
-
-	h1 {
-		margin-block-start: var(--s-3);
+	.seg-host {
+		justify-self: start;
+		max-inline-size: 100%;
+		border-radius: var(--radius-pill);
+		background: var(--surface-sunken);
 	}
-
-	h1 em {
-		color: var(--brick);
-	}
-
-	.head-side {
-		display: flex;
-		align-items: center;
-		gap: var(--s-5);
-		color: var(--ink-2);
-		font-size: 15px;
-	}
-
-	.head-side p {
-		max-inline-size: 24ch;
-		text-align: right;
-	}
-
-	.head-side :global(.add) {
-		display: none;
-	}
-
-	.list {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-4);
-	}
-
-
-	.controls {
-		display: flex;
-	}
-
 	.segment {
-		display: inline-flex;
-		gap: 4px;
-		padding: 4px;
-		border-radius: var(--r-pill);
-		background: var(--ink-wash);
+		display: flex;
+		gap: var(--space-1);
+		padding: var(--space-1);
+		border-radius: var(--radius-pill);
 	}
-
 	.segment button {
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
-		min-block-size: 44px;
-		padding: 0 var(--s-5);
+		justify-content: center;
+		gap: var(--space-2);
+		min-block-size: max(var(--control-height), var(--target));
+		padding-inline: var(--space-5);
 		border: 0;
-		border-radius: var(--r-pill);
+		border-radius: var(--radius-pill);
 		background: transparent;
-		font-size: 15px;
-		font-weight: 500;
+		color: var(--ink);
+		font-size: var(--type-label-size);
+		line-height: var(--type-label-line);
+		font-weight: var(--type-label-weight);
 		white-space: nowrap;
 	}
-
-	.segment .on {
-		background: var(--dark);
-		color: var(--on-dark);
-		box-shadow: var(--shadow-card);
+	.segment button[aria-pressed='true'] {
+		background: var(--surface-inverse);
+		color: var(--ink-on-inverse);
 	}
-
-	.n {
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--ink-2);
+	.segment .n {
+		font-size: var(--type-caption-size);
+		font-variant-numeric: var(--numeric-figures);
+		opacity: 0.75;
 	}
-
-	.on .n {
-		color: var(--on-dark);
-		opacity: 0.8;
+	.list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+		gap: var(--space-2);
+		margin: 0;
+		padding: 0;
+		list-style: none;
 	}
-
-	.no-match {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--s-2);
-		padding: var(--s-9) var(--s-5);
-		border-radius: var(--r-panel);
-		border: 1px dashed var(--line);
-		text-align: center;
-		color: var(--ink-2);
+	.list > li {
+		min-inline-size: 0;
 	}
-
-	.no-match-title {
+	.none {
+		display: grid;
+		gap: var(--space-2);
+		justify-items: start;
+		padding: var(--space-4);
+		border-radius: var(--radius-panel);
+		background: var(--surface-sunken);
+	}
+	.none-title {
 		font-family: var(--font-display);
-		font-size: var(--t-display-3);
-		font-weight: 300;
-		color: var(--ink);
+		font-weight: var(--weight-display);
+		font-size: var(--type-display-s-size);
+		line-height: var(--type-display-s-line);
+		letter-spacing: var(--type-display-s-tracking);
 	}
-
-	.no-match :global(.btn) {
-		margin-block-start: var(--s-4);
+	.none p:not(.none-title) {
+		color: var(--ink-secondary);
 	}
-
-	.side-empty {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--s-4);
-		padding: var(--s-9) var(--s-5);
-		border-radius: var(--r-panel);
-		border: 1px dashed var(--line);
-		text-align: center;
-		color: var(--ink-2);
-	}
-
-	.grid {
-		position: relative;
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: var(--s-5) var(--s-4);
-	}
-
-	.grid > li {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.grid > li > :global(.card),
-	.tile-slot > .add-tile {
-		flex: 1;
-	}
-
-	.grid.intro > li,
-	.empty > * {
-		animation: rise-in var(--d-slow) var(--ease-out) var(--delay, 0ms) backwards;
-	}
-
-	.empty-art {
-		--delay: 90ms;
-	}
-
-	@keyframes rise-in {
-		from {
-			opacity: 0;
-			transform: translateY(16px);
+	@media (max-width: 767px) {
+		.seg-host {
+			justify-self: stretch;
 		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.grid.intro > li,
-		.empty > * {
-			animation: none;
-		}
-	}
-
-	.add-tile {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: var(--s-2);
-		padding: var(--s-5);
-		border: 1.5px dashed var(--line);
-		border-radius: var(--r-card);
-		text-align: center;
-		transition: transform var(--d-base) var(--ease-out);
-	}
-
-	.add-tile:hover {
-		transform: translateY(-3px);
-	}
-
-	.plus {
-		display: grid;
-		place-items: center;
-		inline-size: 48px;
-		block-size: 48px;
-		border-radius: var(--r-pill);
-		background: var(--olive-wash);
-		color: var(--olive);
-	}
-
-	.add-title {
-		font-family: var(--font-display);
-		font-size: 22px;
-		font-weight: 360;
-		line-height: 1.1;
-	}
-
-	.add-sub {
-		max-inline-size: 22ch;
-		font-size: 14px;
-		color: var(--ink-2);
-	}
-
-	.empty {
-		display: grid;
-		grid-template-columns: 5fr 7fr;
-		align-items: center;
-		gap: var(--s-8);
-	}
-
-	.empty-text {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--s-4);
-	}
-
-	.empty-text h2 {
-		font-size: var(--t-display-2);
-	}
-
-	.empty-text p {
-		max-inline-size: 36ch;
-		margin-block-end: var(--s-3);
-		color: var(--ink-2);
-	}
-
-	.empty-art {
-		aspect-ratio: 16 / 10;
-		border-radius: var(--r-frame);
-		overflow: hidden;
-		box-shadow: var(--shadow-card);
-	}
-
-	@media (max-width: 1023px) {
-		.page {
-			gap: var(--s-7);
-		}
-
-		.head {
-			align-items: flex-start;
-		}
-
-		.head-side p {
-			display: none;
-		}
-
-		.head-side :global(.add) {
-			display: inline-flex;
-		}
-
-		.segment {
-			display: flex;
-			flex: 0 0 100%;
-		}
-
-		.controls {
-			flex-wrap: wrap;
-		}
-
 		.segment button {
 			flex: 1;
-			justify-content: center;
-		}
-
-		.grid {
-			grid-template-columns: 1fr 1fr;
-			gap: var(--s-3);
-		}
-
-		.add-tile {
-			padding: var(--s-4);
-		}
-
-		.add-title {
-			font-size: 19px;
-		}
-
-		.add-sub {
-			font-size: 13px;
-		}
-
-		.empty {
-			grid-template-columns: 1fr;
-			gap: var(--s-6);
-		}
-
-		.empty-art {
-			order: -1;
-			aspect-ratio: 4 / 3;
-			border-radius: var(--r-panel);
 		}
 	}
 </style>

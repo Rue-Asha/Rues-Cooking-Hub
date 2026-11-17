@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
 	import Sheet from '#lib/plan/Sheet.svelte';
-	import Button from '#lib/ui/Button.svelte';
+	import Icon from '#lib/ui/Icon.svelte';
+	import Button from '#lib/components/button/Button.svelte';
 
 	let { open, title, usage, onclose }: { open: boolean; title: string; usage: number; onclose: () => void } = $props();
 
@@ -26,8 +27,8 @@
 			</p>
 		{/if}
 		<div class="foot">
-			<Button variant="secondary" arrow={false} onclick={onclose}>Cancel</Button>
-			<Button type="submit" variant="danger" icon="trash" disabled={submitting}>Delete</Button>
+			<Button variant="secondary" autofocus onclick={onclose}>Cancel</Button>
+			<Button type="submit" variant="danger" disabled={submitting}><Icon name="trash" size={18} />Delete</Button>
 		</div>
 	</form>
 </Sheet>
@@ -36,24 +37,23 @@
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-5);
+		gap: var(--space-5);
 	}
 
 	.usage {
-		padding: var(--s-3) var(--s-4);
-		border-radius: var(--r-sm);
-		background: var(--brick-soft);
-		color: var(--brick);
-		font-size: 14px;
-		font-weight: 500;
+		padding: var(--space-3) var(--space-4);
+		border-radius: var(--radius-item);
+		background: var(--danger-soft);
+		color: var(--danger);
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		font-weight: var(--type-label-weight);
 	}
 
 	.foot {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--s-3);
-		padding-block-start: var(--s-3);
-		border-block-start: 1px solid var(--line);
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: var(--space-2);
 	}
 </style>

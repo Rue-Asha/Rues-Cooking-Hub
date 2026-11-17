@@ -19,6 +19,7 @@ async function recordTransitions(page: Page, name: string) {
 	}, name);
 }
 
+const photo = (page: Page) => page.locator('img.stage-photo');
 const calls = (page: Page) => page.evaluate(() => (window as unknown as Recorded).calls);
 const named = (page: Page, name: string) =>
 	page.evaluate((n) => [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).viewTransitionName === n).length, name);
@@ -46,9 +47,9 @@ test('Scenario: Card and spot page share the photo', async ({ page, request }) =
 	const { name } = await shared(page, request, true);
 
 	expect(await calls(page)).toEqual([{ named: 1, inCard: 1 }]);
-	await expect.poll(() => carriedName(page.getByRole('presentation'))).toBe(name);
+	await expect.poll(() => carriedName(photo(page))).toBe(name);
 	expect(await named(page, name)).toBe(1);
-	await expect(page.getByRole('presentation')).toBeVisible();
+	await expect(photo(page)).toBeVisible();
 });
 
 test('Scenario: Spot without photo morphs its placeholder', async ({ page, request }) => {
@@ -56,7 +57,7 @@ test('Scenario: Spot without photo morphs its placeholder', async ({ page, reque
 
 	expect(await calls(page)).toEqual([{ named: 1, inCard: 1 }]);
 	await expect.poll(() => carriedName(page.getByRole('img', { name: 'No photo yet' }))).toBe(name);
-	await expect(page.getByRole('presentation')).toHaveCount(0);
+	await expect(photo(page)).toHaveCount(0);
 });
 
 test('Scenario: Reduced motion skips the spot shared element', async ({ page, request }) => {

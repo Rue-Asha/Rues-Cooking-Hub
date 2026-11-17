@@ -19,12 +19,11 @@
 
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { rise } from '#lib/motion.ts';
 	import { COPY } from '#lib/copy.ts';
 	import type { Id } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
-	import ImagePlaceholder from '#lib/ui/ImagePlaceholder.svelte';
-	import IconButton from '#lib/ui/IconButton.svelte';
+	import Button from '#lib/components/button/Button.svelte';
+	import Field from '#lib/components/field/Field.svelte';
+	import Icon from '#lib/ui/Icon.svelte';
 
 	// `url`, `removed` and `picked` (the chosen file's name) are posted with the form and also drive the form's unsaved check
 	let {
@@ -33,6 +32,8 @@
 		removed = $bindable(false),
 		picked = $bindable(''),
 		error = '',
+		title = '',
+		untitled = '',
 		onchange
 	}: {
 		imageId?: Id | null;
@@ -40,6 +41,9 @@
 		removed: boolean;
 		picked: string;
 		error?: string;
+		// the plate shows the title's first letter; before there is one, the letter of `untitled` ("New recipe"), else it stays neutral
+		title?: string;
+		untitled?: string;
 		onchange?: () => void;
 	} = $props();
 
@@ -55,6 +59,10 @@
 	const src = $derived(objectUrl ?? (linkPreview ? previewUrl : !picked && !removed && imageId !== null ? `/images/${imageId}` : null));
 	const hasImage = $derived(picked !== '' || url.trim() !== '' || (imageId !== null && !removed));
 	const message = $derived(localError || error);
+
+	const named = $derived(title.trim() || untitled);
+	const initial = $derived([...named][0] ?? '');
+	const plate = $derived((([...named].reduce((n, c) => n + c.codePointAt(0)!, 0) % 2) + 1) as 1 | 2);
 
 	function forget() {
 		if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -113,32 +121,27 @@
 </script>
 
 <div class="field">
-	<span class="label" id="image-label">Photo</span>
-	<div class="frame" data-image-frame aria-labelledby="image-label">
+	<div class="picture" class:empty={!hasImage} data-image-frame>
 		{#key src ?? (picked ? 'file' : 'none')}
 			<div class="layer" in:swap out:swap={{ leaving: true }}>
 				{#if src}
 					<img {src} alt="" referrerpolicy="no-referrer" onerror={() => (previewBroken = true)} />
 				{:else}
-					<ImagePlaceholder label={picked || 'No photo yet'} />
+					<span class="plate" data-plate={initial ? plate : 0} role="img" aria-label={picked || 'No photo yet'}>
+						{#if initial}{initial}{:else}<Icon name="image" size={32} />{/if}
+					</span>
 				{/if}
 			</div>
 		{/key}
-		<div class="actions">
-			<Button variant="ghost" arrow={false} icon="image" class="on-photo" onclick={() => fileInput.click()}>
-				{hasImage ? 'Replace' : 'Add photo'}
-			</Button>
-			{#if hasImage}
-				<span class="remove" in:rise={{ y: 6 }}>
-					<IconButton icon="x" label="Remove image" onclick={remove} />
-				</span>
-			{/if}
-		</div>
 	</div>
-
+	<div class="actions">
+		<Button size="s" onclick={() => fileInput.click()}>{hasImage ? 'Replace' : 'Add photo'}</Button>
+		{#if hasImage}<Button variant="quiet" size="s" onclick={remove}>Remove image</Button>{/if}
+	</div>
+	{#if picked}<p class="hint">{picked}</p>{/if}
 	<input
 		bind:this={fileInput}
-		class="visually-hidden"
+		class="sr-only"
 		type="file"
 		name="image"
 		accept="image/*"
@@ -147,112 +150,81 @@
 		onchange={onFile}
 	/>
 	<input type="hidden" name="removeImage" value={removed ? '1' : ''} />
-
-	<input
-		class="link"
+	<Field
+		label="Image link"
 		name="imageUrl"
 		type="url"
+		inputmode="url"
+		autocapitalize="off"
+		autocomplete="off"
+		placeholder="Or paste an image link"
 		bind:value={url}
 		oninput={onUrl}
 		onchange={confirmUrl}
-		placeholder="Or paste an image link"
-		aria-label="Image link"
-		aria-invalid={message ? 'true' : undefined}
-		aria-describedby={message ? 'e-image' : undefined}
-		autocomplete="off"
+		error={message}
 	/>
-	{#if message}<p class="error" id="e-image" role="alert" transition:rise={{ y: 6 }}>{message}</p>{/if}
 </div>
 
 <style>
 	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
+		display: grid;
+		gap: var(--space-3);
 		min-inline-size: 0;
 	}
-
-	.label {
-		font-size: var(--t-small);
-		font-weight: 600;
-	}
-
-	.frame {
-		position: relative;
+	.picture {
 		display: grid;
-		aspect-ratio: 16 / 10;
-		border-radius: var(--r-md);
+		aspect-ratio: 4 / 3;
+		border-radius: var(--radius-panel);
 		overflow: hidden;
 		isolation: isolate;
-		background: var(--sand);
+		background: var(--surface-sunken);
 	}
-
+	/* the empty plate is a wide strip (signed hi-fi); a chosen photo keeps its 4:3. Keyed on the choice, not on
+	   :has(img): a link previews on blur, so the frame grew under the pointer between mousedown and mouseup on Save */
+	.picture.empty {
+		aspect-ratio: 16 / 9;
+	}
 	.layer {
 		grid-area: 1 / 1;
 		min-inline-size: 0;
 		min-block-size: 0;
 	}
-
 	.layer img {
+		display: block;
 		inline-size: 100%;
 		block-size: 100%;
 		object-fit: cover;
 	}
-
-	.actions {
-		position: absolute;
-		inset-inline: var(--s-3);
-		inset-block-end: var(--s-3);
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		z-index: 1;
-	}
-
-	.actions :global(.on-photo) {
-		background: var(--glass);
-		backdrop-filter: var(--glass-filter);
-		-webkit-backdrop-filter: var(--glass-filter);
-		min-block-size: 44px;
-	}
-
-	.remove :global(.icon-btn) {
-		background: var(--glass);
-		backdrop-filter: var(--glass-filter);
-		-webkit-backdrop-filter: var(--glass-filter);
-		border-color: var(--glass-border);
-	}
-
-	.link {
+	.plate {
+		display: grid;
+		place-items: center;
 		inline-size: 100%;
-		min-block-size: 46px;
-		padding: 11px 14px;
-		border-radius: var(--r-sm);
-		border: 1px solid var(--line);
-		background: var(--white);
-		font-size: 15px;
-		line-height: 1.45;
-		transition: border-color var(--d-fast) var(--ease-out);
+		block-size: 100%;
+		font-family: var(--font-display);
+		font-weight: var(--weight-display);
+		font-size: var(--type-display-m-size);
+		line-height: 1;
+		color: var(--ink-secondary);
+		background: var(--surface-sunken);
+		box-shadow: var(--ring-hairline);
 	}
-
-	.link::placeholder {
-		color: var(--ink-2);
+	.plate[data-plate='1'] {
+		color: var(--ink);
+		background: var(--surface-plate-1);
 	}
-
-	.link:focus-visible {
-		border-color: var(--olive);
-		box-shadow: 0 0 0 3px var(--olive-wash);
-		border-radius: var(--r-sm);
+	.plate[data-plate='2'] {
+		color: var(--ink);
+		background: var(--surface-plate-2);
 	}
-
-	.link[aria-invalid='true'] {
-		border-color: var(--brick);
-		box-shadow: 0 0 0 3px var(--brick-wash);
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
 	}
-
-	.error {
-		font-size: var(--t-small);
-		font-weight: 500;
-		color: var(--brick);
+	.hint {
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
+		color: var(--ink-secondary);
+		overflow-wrap: anywhere;
 	}
 </style>

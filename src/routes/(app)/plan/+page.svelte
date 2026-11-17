@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { refreshAll } from '$app/navigation';
+	import { page } from '$app/state';
 	import { MediaQuery } from 'svelte/reactivity';
 	import { fly } from 'svelte/transition';
+	import Button from '#lib/components/button/Button.svelte';
 	import { addDays } from '#lib/dates.ts';
 	import { reducedMotion } from '#lib/motion.ts';
 	import CopyWeek from '#lib/plan/CopyWeek.svelte';
@@ -10,10 +12,10 @@
 	import RecipePicker from '#lib/plan/RecipePicker.svelte';
 	import RecipeRail from '#lib/plan/RecipeRail.svelte';
 	import Week, { weekNumber, weekRange } from '#lib/plan/Week.svelte';
-	import Kicker from '#lib/ui/Kicker.svelte';
-	import ArrowButton from '#lib/ui/ArrowButton.svelte';
-	import Button from '#lib/ui/Button.svelte';
-	import type { Id, PlanEntry, Slot } from '#lib/types.ts';
+	import { registerContextAdd, takeAddFlag } from '#lib/shell/context-add.svelte.ts';
+	import { useStage } from '#lib/shell/stage.svelte.ts';
+	import Icon from '#lib/ui/Icon.svelte';
+	import { SLOTS, type Id, type PlanEntry, type Slot } from '#lib/types.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -32,11 +34,30 @@
 					? { lead: 'Last', word: 'week' }
 					: { lead: 'Week', word: String(number) }
 	);
-	const kicker = $derived(heading.lead === 'Week' ? [range] : [`Week ${number}`, range]);
+	const todayIndex = $derived(data.days.indexOf(data.today));
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const perSlot = $derived(SLOTS.map((s) => ({ label: s.label, n: data.entries.filter((e) => e.slot === s.id).length })));
+
+	// the first picture of a planned recipe is the stage behind the head
+	useStage(() => {
+		const id = data.entries.find((e) => e.recipe?.imageId != null)?.recipe?.imageId;
+		return id == null ? null : `/images/${id}`;
+	});
 
 	let target = $state<{ date: string; slot: Slot } | null>(null);
 	let copying = $state(false);
 	let moving = $state<PlanEntry | null>(null);
+
+	// the "+" of the phone bar and ?add=1 open the dialog for today's Dinner, else Monday Dinner of the shown week
+	const contextTarget = () => ({ date: todayIndex === -1 ? data.monday : data.today, slot: 'dinner' as Slot });
+	$effect(() => registerContextAdd(() => (target = contextTarget())));
+	$effect(() => {
+		if (!takeAddFlag(new URL(page.url.href))) return;
+		const at = contextTarget();
+		// opened from a link on another page there is no opener to go back to; the slot's own add button stands in
+		document.querySelector<HTMLElement>(`[data-date="${at.date}"][data-slot="${at.slot}"] .slot-add`)?.focus({ preventScroll: true });
+		target = at;
+	});
 
 	// a move shows at once and the server's answer replaces it
 	let entries = $derived(data.entries);
@@ -143,34 +164,38 @@
 	<title>Plan · Rues Cooking Hub</title>
 </svelte:head>
 
-<div class="column page" data-column data-sveltekit-noscroll data-sveltekit-keepfocus>
-	<header class="head">
-		{#key data.monday}
-			<div data-page-header in:fly={{ x: reducedMotion() ? 0 : direction * 24, duration: reducedMotion() ? 0 : 320 }}>
-				<Kicker parts={kicker} />
-				<h1>{heading.lead} <em>{heading.word}</em></h1>
-			</div>
-		{/key}
-		<div class="controls">
-			<Button class="copy" variant="ghost" arrow={false} icon="copy" title="Copy week" onclick={() => (copying = true)}>Copy week</Button>
-			<Button variant="secondary" arrow={false} href="/plan?week={data.thisMonday}">This week</Button>
-			<div class="round-nav">
-				<ArrowButton variant="outline" direction="left" label="Previous week" href="/plan?week={prev}" />
-				<ArrowButton variant="dark" label="Next week" href="/plan?week={next}" />
-			</div>
-		</div>
-	</header>
-
-	<div class="board">
-		<RecipeRail recipes={data.recipes} />
-		{#key data.monday}
-			<div class="week-slide" in:fly={{ x: reducedMotion() ? 0 : direction * 36, duration: reducedMotion() ? 0 : 360 }}>
-				<Week days={data.days} today={data.today} {entries} onadd={(date, slot) => (target = { date, slot })} />
-			</div>
-		{/key}
+<header class="screen-head plan-head">
+	<div class="screen-lead">
+		<ul class="kicker">
+			<li>Meal plan</li>
+			<li>Week {number}</li>
+			<li>{range}</li>
+			{#if todayIndex !== -1}
+				<li>Day&nbsp;<span class="position">{pad(todayIndex + 1)}<span class="of"><span class="sr-only">&nbsp;of&nbsp;</span><span aria-hidden="true">&nbsp;/&nbsp;</span>07</span></span></li>
+			{/if}
+		</ul>
+		<h1>{heading.lead} <em class="accent-word">{heading.word}</em></h1>
 	</div>
-</div>
+	<div class="seg-bar plan-bar">
+		<div class="seg week-step" role="group" aria-label="Week">
+			<Button variant="secondary" size="s" icon label="Previous week" href="/plan?week={prev}" data-sveltekit-keepfocus><Icon name="chevron-left" size={20} /></Button>
+			<span class="seg-text"><span class="seg-label">Week {number}</span><span class="seg-value">{range}</span></span>
+			<Button variant="secondary" size="s" icon label="Next week" href="/plan?week={next}" data-sveltekit-keepfocus><Icon name="chevron-right" size={20} /></Button>
+		</div>
+		<div class="seg">
+			<Button variant="quiet" size="s" href="/plan?week={data.thisMonday}" aria-current={data.monday === data.thisMonday ? 'page' : undefined} data-sveltekit-keepfocus>This week</Button>
+		</div>
+		<div class="seg-actions"><Button variant="primary" arrow onclick={() => (copying = true)}>Copy week</Button></div>
+	</div>
+	{#if data.entries.length > 0}
+		<ul class="screen-facts" data-surface={todayIndex === -1 ? 'inverse' : undefined} aria-label="Planned per meal">
+			<li class="facts-caption" aria-hidden="true">Planned per meal</li>
+			{#each perSlot as s (s.label)}<li><span class="n">{s.n.toLocaleString('en-GB')}</span>{s.label}</li>{/each}
+		</ul>
+	{/if}
+</header>
 
+<!-- portalled dialogs sit before the body, never last: the page's teardown removes everything from its first to its last top-level node -->
 <CopyWeek
 	open={copying}
 	monday={data.monday}
@@ -191,93 +216,86 @@
 	onclose={() => (moving = null)}
 />
 
+<div class="screen-body" data-settle>
+	<div class="layout">
+		<div class="main">
+			{#if data.entries.length === 0}<p class="plan-empty">Nothing planned yet — tap + to add a meal</p>{/if}
+			{#key data.monday}
+				<div class="week-slide" in:fly={{ x: reducedMotion() ? 0 : direction * 36, duration: reducedMotion() ? 0 : 360 }}>
+					<Week days={data.days} today={data.today} {entries} onadd={(date, slot) => (target = { date, slot })} />
+				</div>
+			{/key}
+		</div>
+		<RecipeRail recipes={data.recipes} />
+	</div>
+</div>
+
 <style>
-	.page {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-7);
+	/* the week's facts read on a solid card, never on glass over the photo; the charcoal belongs to the Today row, or to these facts when no day is today */
+	.plan-head :global(.screen-facts:not([data-surface='inverse'])) {
+		background: var(--surface-card);
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
 	}
 
-	.head {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: var(--s-4);
+	.plan-bar {
+		background: var(--surface-card);
 	}
 
-	h1 {
-		margin-block-start: var(--s-3);
+	.week-step {
+		gap: var(--space-2);
 	}
 
-	h1 em {
-		color: var(--brick);
+	.week-step .seg-text {
+		min-inline-size: 8.5em;
+		text-align: center;
 	}
 
-	.controls {
-		display: flex;
-		align-items: center;
-		gap: var(--s-2);
-	}
-
-	.round-nav {
-		display: inline-flex;
-		gap: var(--s-2);
-		color: var(--ink);
-	}
-
-	.board {
+	.layout {
 		display: grid;
-		grid-template-columns: 248px minmax(0, 1fr);
-		gap: var(--s-4);
+		gap: var(--space-4);
 		align-items: start;
+		min-inline-size: 0;
+	}
+
+	.main {
+		display: grid;
+		gap: var(--space-3);
+		min-inline-size: 0;
 	}
 
 	.week-slide {
 		min-inline-size: 0;
 	}
 
-	@media (max-width: 1023px) {
-		.head {
-			flex-direction: column;
-			align-items: stretch;
-		}
+	/* one line for a week with nothing in it; on a mouse desktop the picker and the add controls say it already */
+	.plan-empty {
+		padding: var(--space-3) var(--space-4);
+		border-radius: var(--radius-item);
+		background: var(--surface-card);
+		box-shadow: var(--ring-hairline);
+		color: var(--ink-secondary);
+	}
 
-		.controls {
+	@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+		.plan-empty {
+			display: none;
+		}
+	}
+
+	@media (max-width: 767px) {
+		.week-step {
 			justify-content: space-between;
 		}
 
-		.round-nav {
-			order: -1;
-		}
-
-		.board {
-			display: block;
+		.plan-bar .seg:not(.week-step) {
+			justify-content: center;
 		}
 	}
 
-	/* three controls do not fit a narrow phone, so the copy button keeps only its icon and the label for screen readers */
-	@media (max-width: 479px) {
-		.controls :global(.copy) {
-			padding: 0;
-			inline-size: 48px;
-		}
-
-		.controls :global(.copy .label) {
-			position: absolute;
-			inline-size: 1px;
-			block-size: 1px;
-			overflow: hidden;
-			clip-path: inset(50%);
-		}
-
-		.controls :global(.copy .icon) {
-			margin: 0;
-		}
-	}
-
-	@media (min-width: 1024px) and (max-width: 1179px) {
-		.board {
-			grid-template-columns: 208px minmax(0, 1fr);
+	@media (min-width: 1024px) {
+		.layout {
+			grid-template-columns: minmax(0, 1fr) 15.5rem;
 		}
 	}
 </style>

@@ -20,15 +20,17 @@
 
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
-	import { tick } from 'svelte';
-	import Button from '#lib/ui/Button.svelte';
-	import { rise } from '#lib/motion.ts';
+	import { onMount, tick } from 'svelte';
+	import Button from '#lib/components/button/Button.svelte';
+	import Field from '#lib/components/field/Field.svelte';
+	import Status from '#lib/ui/Status.svelte';
 	import ImageField from './ImageField.svelte';
 	import DiscardDialog from './DiscardDialog.svelte';
 	import SectionsEditor, { plain, toEditor } from './SectionsEditor.svelte';
 	import TagInput from './TagInput.svelte';
+	import Area from './Area.svelte';
+	import { clearDraft, isDraftWorthKeeping, loadDraft, saveDraft, type RecipeFormDraft } from './draft.ts';
 	import { unsavedGuard } from './unsaved.ts';
-	import Icon from '#lib/ui/Icon.svelte';
 
 	let {
 		draft,
@@ -37,7 +39,13 @@
 		action = '',
 		heading = 'Recipe',
 		notice = null,
-		cancelHref = '/recipes'
+		cancelHref = '/recipes',
+		keep = false,
+		imported = false,
+		host = '',
+		restore = false,
+		untitled = '',
+		ondiscarddraft
 	}: {
 		draft: FormDraft;
 		errors?: Record<string, string>;
@@ -46,6 +54,15 @@
 		heading?: string;
 		notice?: string | null;
 		cancelHref?: string;
+		// new and imported recipes keep a local draft; a stored recipe being edited has none
+		keep?: boolean;
+		imported?: boolean;
+		host?: string;
+		// open with the stored draft, if there is one
+		restore?: boolean;
+		// the plate's letter while the title is empty: "New recipe" on a blank new form; an edited or imported recipe stays neutral
+		untitled?: string;
+		ondiscarddraft?: () => void;
 	} = $props();
 
 	// the form seeds its fields once; a draft never changes under a mounted form
@@ -71,7 +88,7 @@
 	let tagNames = $state([...draft.tagNames]);
 	let tagText = $state('');
 	/* svelte-ignore state_referenced_locally */
-	let ingredients = $state(toEditor(draft.ingredients, 3));
+	let ingredients = $state(toEditor(draft.ingredients, 1));
 	/* svelte-ignore state_referenced_locally */
 	let steps = $state(toEditor(draft.steps, 1));
 
@@ -93,9 +110,75 @@
 			imagePicked
 		]);
 	const initial = snapshot();
-	const guard = unsavedGuard(() => snapshot() !== initial);
+	// the draft keeps neither a chosen photo file nor half-typed tag text, and none at all when storage is blocked
+	let kept = true;
+	const guard = unsavedGuard(() => snapshot() !== initial, { unload: () => !keep || !kept || imagePicked !== '' || tagText.trim() !== '' });
 	const leaving = guard.pending;
 
+	const uid = $props.id();
+
+	const formDraft = (): RecipeFormDraft => ({
+		title,
+		description,
+		servings,
+		prepMinutes,
+		cookMinutes,
+		sourceUrl,
+		notes,
+		tagNames: [...tagNames],
+		ingredients: plain(ingredients).map(([t, lines]) => ({ title: t || null, lines: [...lines] })),
+		steps: plain(steps).map(([t, lines]) => ({ title: t || null, lines: [...lines] })),
+		imageUrl
+	});
+	const start = formDraft();
+
+	// the draft is written only after the stored one was read, or the blank form would erase it
+	let ready = $state(false);
+	let restored = $state(false);
+	onMount(() => {
+		const stored = restore ? loadDraft(localStorage) : null;
+		if (stored) {
+			const f = stored.form;
+			title = f.title;
+			description = f.description;
+			servings = f.servings;
+			prepMinutes = f.prepMinutes;
+			cookMinutes = f.cookMinutes;
+			sourceUrl = f.sourceUrl;
+			notes = f.notes;
+			tagNames = [...f.tagNames];
+			ingredients = toEditor(f.ingredients, 1);
+			steps = toEditor(f.steps, 1);
+			imageUrl = f.imageUrl;
+			restored = true;
+		}
+		ready = true;
+	});
+	$effect(() => {
+		if (!keep || !ready) return;
+		const now = formDraft();
+		if (isDraftWorthKeeping(now, start)) kept = saveDraft(localStorage, { v: 1, imported, ...(host && { host }), form: now });
+		else clearDraft(localStorage);
+	});
+
+	function discardDraft() {
+		clearDraft(localStorage);
+		ready = false;
+		title = start.title;
+		description = start.description;
+		servings = start.servings;
+		prepMinutes = start.prepMinutes;
+		cookMinutes = start.cookMinutes;
+		sourceUrl = start.sourceUrl;
+		notes = start.notes;
+		tagNames = [...start.tagNames];
+		ingredients = toEditor(start.ingredients, 1);
+		steps = toEditor(start.steps, 1);
+		imageUrl = start.imageUrl;
+		restored = false;
+		ready = true;
+		ondiscarddraft?.();
+	}
 	let formEl: HTMLFormElement;
 	let saving = $state(false);
 
@@ -115,319 +198,266 @@
 	const submit: SubmitFunction = () => {
 		saving = true;
 		return async ({ result, update }) => {
-			if (result.type === 'redirect') guard.allow();
+			if (result.type === 'redirect') {
+				ready = false;
+				if (keep) clearDraft(localStorage);
+				guard.allow();
+			}
 			await update({ reset: false });
 			saving = false;
 		};
 	};
+
+	// the dialog has to clear the Save bar, which is on <body> (see portal)
+	function toBody(node: HTMLElement) {
+		// moving a node drops the focus inside it, and the dialog takes focus before this runs
+		const focused = node.contains(document.activeElement) ? (document.activeElement as HTMLElement) : null;
+		document.body.appendChild(node);
+		focused?.focus();
+		return { destroy: () => node.remove() };
+	}
+
+	// The one Save sits in a bar fixed to the viewport; it moves to <body> because inside .frame a fixed box would follow
+	// the frame's backdrop-filter, not the viewport. Focused fields scroll clear of it (base.css reads --sticky-block-end).
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		document.documentElement.style.setProperty('--sticky-block-end', 'var(--form-clearance)');
+		return {
+			destroy() {
+				node.remove();
+				document.documentElement.style.removeProperty('--sticky-block-end');
+			}
+		};
+	}
 </script>
 
-{#snippet saveButtons()}
-	<Button variant="secondary" arrow={false} href={cancelHref}>Cancel</Button>
-	<Button variant="olive" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save recipe'}</Button>
-{/snippet}
+{#if notice}
+	<div class="notice"><Status kind="alert">{notice}</Status></div>
+{/if}
 
-<form class="recipe-form" method="POST" {action} enctype="multipart/form-data" novalidate use:enhance={submit} bind:this={formEl}>
-	{#if notice}
-		<div class="banner fail" role="status" in:rise>
-			<Icon name="alert" size={20} />
-			<p>{notice}</p>
-		</div>
-	{/if}
+{#if restored}
+	<div class="notice">
+		<Status>
+			Restored your unsaved draft
+			<span class="act"><Button size="xs" onclick={discardDraft}>Discard draft</Button></span>
+		</Status>
+	</div>
+{/if}
 
-	<div class="head enter" style="--i: 0">
-		<h2 data-section-heading>{heading}</h2>
-		<div class="save top">{@render saveButtons()}</div>
+<form
+	id="{uid}-form"
+	class="form"
+	method="POST"
+	{action}
+	enctype="multipart/form-data"
+	novalidate
+	use:enhance={submit}
+	bind:this={formEl}
+>
+	<div class="main-lead">
+		<section class="card" data-surface="solid" aria-labelledby="{uid}-basics">
+			<div class="card-head"><h2 id="{uid}-basics">{heading}</h2></div>
+			<Field
+				label="Title"
+				name="title"
+				bind:value={title}
+				oninput={() => dismiss('title')}
+				error={shown.title}
+				autocomplete="off"
+			/>
+			<Area label="Description (optional)" name="description" rows={3} bind:value={description} />
+			<div class="trio">
+				<Field
+					label="Servings"
+					name="servings"
+					inputmode="numeric"
+					autocomplete="off"
+					bind:value={servings}
+					oninput={() => dismiss('servings')}
+					error={shown.servings}
+				/>
+				<Field
+					label="Prep, min"
+					name="prepMinutes"
+					inputmode="numeric"
+					autocomplete="off"
+					bind:value={prepMinutes}
+					oninput={() => dismiss('prepMinutes')}
+					error={shown.prepMinutes}
+				/>
+				<Field
+					label="Cook, min"
+					name="cookMinutes"
+					inputmode="numeric"
+					autocomplete="off"
+					bind:value={cookMinutes}
+					oninput={() => dismiss('cookMinutes')}
+					error={shown.cookMinutes}
+				/>
+			</div>
+			<Field label="Source (optional)" name="sourceUrl" type="url" inputmode="url" autocapitalize="off" autocomplete="off" bind:value={sourceUrl} />
+		</section>
 	</div>
 
-	<div class="form">
-		<div class="meta enter" style="--i: 1">
-			<h3 class="col-title">Details</h3>
-
+	<aside class="side">
+		<section class="card" data-surface="solid" aria-labelledby="{uid}-photo">
+			<div class="card-head"><h2 id="{uid}-photo">Photo</h2></div>
 			<ImageField
 				imageId={draft.imageId ?? null}
 				bind:url={imageUrl}
 				bind:removed={imageRemoved}
 				bind:picked={imagePicked}
 				error={shown.image}
+				{title}
+				{untitled}
 				onchange={() => dismiss('image')}
 			/>
+		</section>
 
-			<div class="field">
-				<label for="f-title">Title</label>
-				<input
-					id="f-title"
-					name="title"
-					bind:value={title}
-					oninput={() => dismiss('title')}
-					aria-invalid={shown.title ? 'true' : undefined}
-					aria-describedby={shown.title ? 'e-title' : undefined}
-					autocomplete="off"
-				/>
-				{#if shown.title}<p class="error" id="e-title" role="alert" transition:rise={{ y: 6 }}>{shown.title}</p>{/if}
+		<section class="card" data-surface="solid" aria-labelledby="{uid}-tags">
+			<div class="card-head">
+				<h2 id="{uid}-tags">Tags</h2>
+				<span class="card-note">{tagNames.length}</span>
 			</div>
-
-			<div class="field">
-				<label for="f-description">Description <i>optional</i></label>
-				<textarea id="f-description" name="description" rows="3" bind:value={description}></textarea>
-			</div>
-
-			<div class="trio">
-				<div class="field">
-					<label for="f-servings">Servings</label>
-					<input
-						id="f-servings"
-						class="tnum"
-						name="servings"
-						inputmode="numeric"
-						bind:value={servings}
-						oninput={() => dismiss('servings')}
-						aria-invalid={shown.servings ? 'true' : undefined}
-						aria-describedby={shown.servings ? 'e-servings' : undefined}
-					/>
-				</div>
-				<div class="field">
-					<label for="f-prep">Prep, min</label>
-					<input
-						id="f-prep"
-						class="tnum"
-						name="prepMinutes"
-						inputmode="numeric"
-						bind:value={prepMinutes}
-						oninput={() => dismiss('prepMinutes')}
-						aria-invalid={shown.prepMinutes ? 'true' : undefined}
-						aria-describedby={shown.prepMinutes ? 'e-prep' : undefined}
-					/>
-				</div>
-				<div class="field">
-					<label for="f-cook">Cook, min</label>
-					<input
-						id="f-cook"
-						class="tnum"
-						name="cookMinutes"
-						inputmode="numeric"
-						bind:value={cookMinutes}
-						oninput={() => dismiss('cookMinutes')}
-						aria-invalid={shown.cookMinutes ? 'true' : undefined}
-						aria-describedby={shown.cookMinutes ? 'e-cook' : undefined}
-					/>
-				</div>
-			</div>
-			{#if shown.servings}<p class="error" id="e-servings" role="alert" transition:rise={{ y: 6 }}>{shown.servings}</p>{/if}
-			{#if shown.prepMinutes}<p class="error" id="e-prep" role="alert" transition:rise={{ y: 6 }}>{shown.prepMinutes}</p>{/if}
-			{#if shown.cookMinutes}<p class="error" id="e-cook" role="alert" transition:rise={{ y: 6 }}>{shown.cookMinutes}</p>{/if}
-
 			<TagInput {tags} bind:selected={tagNames} bind:pending={tagText} />
+		</section>
+	</aside>
 
-			<div class="field">
-				<label for="f-source">Source <i>optional</i></label>
-				<input id="f-source" name="sourceUrl" type="url" bind:value={sourceUrl} autocomplete="off" />
-			</div>
-		</div>
-
-		<div class="lines enter" style="--i: 2">
-			<h3 class="col-title">Ingredients</h3>
+	<div class="main-rest">
+		<section class="card" data-surface="solid" aria-labelledby="{uid}-ing">
+			<div class="card-head"><h2 id="{uid}-ing">Ingredients</h2></div>
 			<SectionsEditor kind="ingredients" bind:sections={ingredients} />
+		</section>
 
-			<h3 class="col-title steps-title">Method</h3>
+		<section class="card" data-surface="solid" aria-labelledby="{uid}-met">
+			<div class="card-head"><h2 id="{uid}-met">Method</h2></div>
 			<SectionsEditor kind="steps" bind:sections={steps} />
+		</section>
 
-			<h3 class="col-title steps-title">Notes</h3>
-			<div class="field">
-				<label class="visually-hidden" for="f-notes">Notes</label>
-				<textarea
-					id="f-notes"
-					name="notes"
-					rows="3"
-					bind:value={notes}
-					placeholder="Tips, variations, storage. Markdown works."
-				></textarea>
-			</div>
+		<section class="card" data-surface="solid">
+			<div class="card-head"><h2 id="{uid}-notes">Notes</h2></div>
+			<Area label="Notes" hideLabel name="notes" rows={4} bind:value={notes} placeholder="Tips, variations, storage. Markdown works." />
+		</section>
+	</div>
+
+	<div class="savebar" use:portal>
+		<div class="capsule" role="group" aria-label="Save">
+			<Button variant="quiet" href={cancelHref}>Cancel</Button>
+			<Button variant="primary" arrow type="submit" form="{uid}-form" loading={saving} disabled={saving} loadingLabel="">{saving ? 'Saving…' : 'Save recipe'}</Button>
 		</div>
 	</div>
 
-	<div class="save bottom">{@render saveButtons()}</div>
-
-	{#if $leaving}<DiscardDialog onkeep={guard.keep} ondiscard={guard.discard} />{/if}
+	{#if $leaving}
+		<div class="dialog-host" use:toBody><DiscardDialog
+				onkeep={guard.keep}
+				ondiscard={() => {
+					if (keep) clearDraft(localStorage);
+					guard.discard();
+				}}
+			/></div>
+	{/if}
 </form>
 
 <style>
-	.recipe-form {
+	.form {
+		display: grid;
+		gap: var(--space-4);
+		min-inline-size: 0;
+	}
+	.notice {
+		margin-block-end: var(--space-4);
+	}
+	.main-lead,
+	.main-rest,
+	.side {
+		display: grid;
+		gap: var(--space-4);
+		align-content: start;
+		min-inline-size: 0;
+	}
+	.card {
+		display: grid;
+		gap: var(--space-4);
+		align-content: start;
+		padding: var(--space-5);
+		min-inline-size: 0;
+	}
+	.card-head h2 {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow: hidden;
+		overflow-wrap: anywhere;
+	}
+	.trio {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+		gap: var(--space-3);
+		min-inline-size: 0;
+	}
+	.act {
+		display: block;
+		margin-block-start: var(--space-2);
+	}
+	.dialog-host {
+		display: contents;
+	}
+	/* Below 1024 px the Save capsule floats a small gap above the phone bar, lifted by the bar's measured height
+	   (--dock-block-size, PhoneBar) over the bar's own offset from the bottom edge; a focused field clears both. */
+	:global(:root) {
+		--savebar-lift: calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--dock-block-size, var(--space-16)) + var(--space-2-5));
+		--form-clearance: calc(var(--savebar-lift) + var(--space-16));
+	}
+	.savebar {
+		position: fixed;
+		inset-inline: var(--space-2);
+		inset-block-end: var(--savebar-lift);
+		z-index: var(--z-rail);
 		display: flex;
-		flex-direction: column;
-		gap: var(--s-5);
+		justify-content: center;
+		pointer-events: none;
 	}
-
-	.enter {
-		animation: enter var(--d-slow) var(--ease-out) both;
-		animation-delay: calc(var(--i, 0) * 60ms);
-	}
-
-	@keyframes enter {
-		from {
-			opacity: 0;
-			transform: translateY(14px);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.enter {
-			animation: none;
-		}
-	}
-
-	.banner {
-		display: flex;
-		align-items: flex-start;
-		gap: var(--s-3);
-		padding: var(--s-4) var(--s-5);
-		border-radius: var(--r-md);
-		font-size: 14px;
-		font-weight: 500;
-	}
-
-	.fail {
-		background: var(--brick-soft);
-	}
-
-	.fail :global(.icon) {
-		color: var(--brick);
-		flex: none;
-	}
-
-	.head {
+	.capsule {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: var(--s-4);
+		gap: var(--space-2);
+		inline-size: min(100%, 32rem);
+		padding: var(--space-1-5);
+		border-radius: var(--radius-pill);
+		background: var(--surface-glass-strong);
+		-webkit-backdrop-filter: var(--glass-filter);
+		backdrop-filter: var(--glass-filter);
+		box-shadow: var(--elevation-card);
+		pointer-events: auto;
 	}
-
-	.save {
-		display: flex;
-		gap: var(--s-2);
-	}
-
-	.save.bottom {
-		display: none;
-	}
-
-	.form {
-		display: grid;
-		grid-template-columns: 420px 1fr;
-		gap: var(--s-6);
-		align-items: start;
-	}
-
-	.form > * {
-		min-inline-size: 0;
-	}
-
-	.meta,
-	.lines {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-4);
-		padding: var(--s-6);
-		border-radius: var(--r-panel);
-		background: var(--surface);
-		box-shadow: var(--shadow-card);
-	}
-
-	.col-title {
-		font-family: var(--font-display);
-		font-size: 24px;
-		font-weight: 360;
-	}
-
-	.steps-title {
-		margin-block-start: var(--s-4);
-	}
-
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		min-inline-size: 0;
-	}
-
-	.field > label {
-		font-size: var(--t-small);
-		font-weight: 600;
-	}
-
-	.field i {
-		font-weight: 400;
-		font-style: normal;
-		color: var(--ink-2);
-	}
-
-	input,
-	textarea {
-		inline-size: 100%;
-		min-block-size: 46px;
-		padding: 11px 14px;
-		border-radius: var(--r-sm);
-		border: 1px solid var(--line);
-		background: var(--white);
-		font-size: 15px;
-		line-height: 1.45;
-		transition: border-color var(--d-fast) var(--ease-out);
-	}
-
-	textarea {
-		resize: vertical;
-		field-sizing: content;
-	}
-
-	input::placeholder,
-	textarea::placeholder {
-		color: var(--ink-2);
-	}
-
-	input:focus-visible,
-	textarea:focus-visible {
-		border-color: var(--olive);
-		box-shadow: 0 0 0 3px var(--olive-wash);
-		border-radius: var(--r-sm);
-	}
-
-	input[aria-invalid='true'] {
-		border-color: var(--brick);
-		box-shadow: 0 0 0 3px var(--brick-wash);
-	}
-
-	.error {
-		font-size: var(--t-small);
-		font-weight: 500;
-		color: var(--brick);
-	}
-
-	.trio {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: var(--s-3);
-	}
-
-	@media (max-width: 1023px) {
-		.head .save {
-			display: none;
-		}
-
-		.save.bottom {
-			display: flex;
-		}
-
-		.save.bottom :global(.btn:last-child) {
-			flex: 1;
-		}
-
+	@media (min-width: 768px) {
 		.form {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+			grid-template-rows: auto 1fr;
+			align-items: start;
 		}
-
-		.meta,
-		.lines {
-			padding: var(--s-5) var(--s-4);
+		.main-lead {
+			grid-area: 1 / 1;
+		}
+		.main-rest {
+			grid-area: 2 / 1;
+		}
+		.side {
+			grid-area: 1 / 2 / span 2;
+		}
+	}
+	@media (min-width: 1024px) {
+		:global(:root) {
+			--form-clearance: calc(var(--space-16) + var(--space-4));
+		}
+		.savebar {
+			inset-block-end: max(var(--space-4), env(safe-area-inset-bottom));
+		}
+		.capsule {
+			inline-size: auto;
+			justify-content: flex-end;
 		}
 	}
 </style>

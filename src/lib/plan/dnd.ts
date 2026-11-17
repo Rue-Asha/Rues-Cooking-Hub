@@ -1,7 +1,6 @@
 import { getContext, setContext } from 'svelte';
-import { cubicInOut } from 'svelte/easing';
 import type { TransitionConfig } from 'svelte/transition';
-import { reducedMotion, rise, slideOut } from '#lib/motion.ts';
+import { arrive, easeInOut, reducedMotion, slideOut } from '#lib/motion.ts';
 import { SLOTS, type Id, type IsoDate, type PlanEntry, type Slot } from '#lib/types.ts';
 
 export type Place = { date: IsoDate; slot: Slot };
@@ -39,7 +38,7 @@ export function placed(entries: PlanEntry[], id: Id, to: Place & { position?: nu
 		.sort((a, b) => a.date.localeCompare(b.date) || rank(a.slot) - rank(b.slot) || a.position - b.position);
 }
 
-// An entry that changes slot flies from its old place to its new one; an entry with no counterpart rises in or slides out.
+// An entry that changes slot flies from its old place to its new one; an entry with no counterpart settles in or fades out.
 // A dropped card lands from where the drag image was let go instead of from its old place.
 const sending = new Map<Id, Element>();
 const receiving = new Map<Id, Element>();
@@ -73,8 +72,8 @@ function glide(a: { left: number; top: number }, node: Element, intro: boolean):
 	const dx = a.left - b.left;
 	const dy = a.top - b.top;
 	return {
-		duration: Math.min(640, 340 + Math.sqrt(Math.hypot(dx, dy)) * 9),
-		easing: cubicInOut,
+		duration: Math.min(480, 260 + Math.sqrt(Math.hypot(dx, dy)) * 8),
+		easing: easeInOut,
 		css: (t, u) =>
 			intro
 				? `transform: translate(${(u * dx).toFixed(2)}px, ${(u * dy).toFixed(2)}px) scale(${(1 + Math.sin(t * Math.PI) * 0.04).toFixed(3)}); opacity: ${Math.min(1, t * 3)}`
@@ -99,7 +98,7 @@ function pair(mine: Map<Id, Element>, other: Map<Id, Element>, intro: boolean) {
 				return glide(counterpart.getBoundingClientRect(), node, intro);
 			}
 			mine.delete(key);
-			return intro ? rise(node, { y: 10 }) : slideOut(node);
+			return intro ? arrive(node) : slideOut(node);
 		};
 	};
 }
@@ -116,7 +115,7 @@ export function ghost(event: DragEvent, source: HTMLElement): void {
 	frame.style.cssText = `position: fixed; inset-block-start: -1000px; inset-inline-start: -1000px; padding: ${pad}px; pointer-events: none;`;
 	const card = source.cloneNode(true) as HTMLElement;
 	card.removeAttribute('data-dragging');
-	card.style.cssText = `inline-size: ${box.width}px; margin: 0; background: var(--white); border-radius: var(--r-sm); box-shadow: var(--shadow-lift); transform: rotate(-3deg) scale(1.03);`;
+	card.style.cssText = `inline-size: ${box.width}px; margin: 0; background: var(--surface-raised); border-radius: var(--radius-item); box-shadow: var(--shadow-lift); transform: rotate(-3deg) scale(1.03);`;
 	frame.append(card);
 	document.body.append(frame);
 	event.dataTransfer.setDragImage(frame, event.clientX - box.left + pad, event.clientY - box.top + pad);

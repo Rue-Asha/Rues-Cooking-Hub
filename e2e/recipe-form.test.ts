@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { expect, test, type Page } from '@playwright/test';
-import { calm, open, reset } from './helpers.ts';
+import sharp from 'sharp';
+import { calm, open, placeholderRoom, reset, seed } from './helpers.ts';
 
 const port = Number(process.env.PORT ?? 4173);
 
@@ -45,6 +46,42 @@ test('Scenario: Servings below 1 are rejected in the form', async ({ page }) => 
 	expect(recipeCount()).toBe(0);
 });
 
+test('Scenario: A new recipe form starts with one line, the plate and four suggestions', async ({ page, request }, info) => {
+	test.skip(info.project.name !== 'phone', 'sets its own viewport');
+	await seed(request, {
+		recipes: [{ title: 'Tagged', tags: ['Autumn', 'Baking', 'Breakfast', 'Dessert', 'Quick', 'Salad', 'Side', 'Snack', 'Soup', 'Spring', 'Summer', 'Winter'] }]
+	});
+	await page.setViewportSize({ width: 375, height: 812 });
+	await open(page, '/recipes/new/form');
+
+	const lines = page.getByRole('group', { name: 'Ingredient section 1' }).getByLabel('Ingredient line');
+	await expect(lines).toHaveCount(1);
+	await expect(page.getByRole('button', { name: 'Remove line' })).toHaveCount(0);
+	const placeholder = await placeholderRoom(lines);
+	expect(placeholder.text, 'placeholder fits').toBeLessThanOrEqual(placeholder.room);
+	await expect(page.getByRole('img', { name: 'No photo yet' })).toHaveText('N');
+	const frame = await page.locator('[data-image-frame]').boundingBox();
+	expect(frame!.width / frame!.height, 'the empty plate is 16:9').toBeCloseTo(16 / 9, 1);
+
+	const suggestions = page.getByRole('group', { name: 'Tag suggestions' }).getByRole('button');
+	await expect(suggestions).toHaveCount(4);
+	await page.getByLabel('Add a tag').fill('s');
+	await expect(suggestions).toHaveCount(4);
+	for (const name of await suggestions.allTextContents()) expect(name.toLowerCase()).toContain('s');
+});
+
+test('Scenario: An edited recipe without a title keeps a neutral plate', async ({ page, request }) => {
+	const { recipes } = await seed(request, { recipes: [{ title: 'Soup' }] });
+	await open(page, `/recipes/${recipes[0]}/edit`);
+	const plate = page.getByRole('img', { name: 'No photo yet' });
+	await expect(plate).toHaveText('S');
+
+	await page.getByLabel('Title', { exact: true }).fill('');
+
+	await expect(plate).toHaveText('');
+	await expect(plate.locator('svg')).toHaveCount(1);
+});
+
 test('Scenario: Recipe created from scratch', async ({ page }) => {
 	await open(page, '/recipes/new/form');
 	await page.getByLabel('Title', { exact: true }).fill('Pizza night');
@@ -52,6 +89,7 @@ test('Scenario: Recipe created from scratch', async ({ page }) => {
 	const dough = page.getByRole('group', { name: 'Ingredient section 1' });
 	await dough.getByLabel('Section title').fill('For the dough');
 	await dough.getByLabel('Ingredient line').nth(0).fill('300 g flour');
+	await page.keyboard.press('Enter');
 	await dough.getByLabel('Ingredient line').nth(1).fill('1 tsp salt');
 	await page.getByRole('button', { name: 'Add ingredient section' }).click();
 	const sauce = page.getByRole('group', { name: 'Ingredient section 2' });
@@ -127,7 +165,7 @@ test('Enter in an ingredient line adds a line below and does not save', async ({
 
 	await lines.first().press('Enter');
 
-	await expect(lines).toHaveCount(4);
+	await expect(lines).toHaveCount(2);
 	await expect(lines.nth(1)).toBeFocused();
 	await expect(page).toHaveURL(/\/recipes\/new\/form$/);
 	expect(recipeCount()).toBe(0);
@@ -138,16 +176,20 @@ test('lines and sections can be added and removed, and the last of each stays', 
 	const lines = page.getByLabel('Ingredient line');
 	const sections = page.getByRole('group', { name: /^Ingredient section/ });
 
-	await expect(lines).toHaveCount(3);
+	await expect(lines).toHaveCount(1);
 	await page.getByRole('button', { name: 'Add line' }).click();
-	await expect(lines).toHaveCount(4);
-	await page.getByRole('button', { name: 'Remove line' }).nth(1).click();
+	await page.getByRole('button', { name: 'Add line' }).click();
 	await expect(lines).toHaveCount(3);
+	await page.getByRole('button', { name: 'Remove line' }).nth(1).click();
+	await expect(lines).toHaveCount(2);
+	await page.getByRole('button', { name: 'Remove line' }).nth(1).click();
+	await expect(lines).toHaveCount(1);
+	await expect(page.getByRole('button', { name: 'Remove line' }), 'the last line stays').toHaveCount(0);
 
 	await expect(page.getByRole('button', { name: 'Remove section' })).toHaveCount(0);
 	await page.getByRole('button', { name: 'Add ingredient section' }).click();
 	await expect(sections).toHaveCount(2);
-	await expect(lines).toHaveCount(4);
+	await expect(lines).toHaveCount(2);
 	await sections.nth(1).getByRole('button', { name: 'Remove section' }).click();
 	await expect(sections).toHaveCount(1);
 	await expect(page.getByRole('button', { name: 'Remove section' })).toHaveCount(0);
@@ -185,7 +227,10 @@ test('adding a line, a section and a parse preview animate, and not under reduce
 	expect(await animations(page)).toBeGreaterThan(0);
 
 	await calm(page);
+	// the first part left a draft behind, which would restore its added section
+	await page.evaluate(() => localStorage.clear());
 	await open(page, '/recipes/new/form');
+	await idle(page);
 	await page.getByRole('button', { name: 'Add line' }).click();
 	await page.getByLabel('Ingredient line').first().fill('2 eggs');
 	await page.getByRole('button', { name: 'Add ingredient section' }).click();
@@ -216,6 +261,7 @@ test('Scenario: New tag created while editing a recipe', async ({ page }) => {
 	await expect(page.getByRole('list', { name: 'Selected tags' }).getByText('Weeknight', { exact: true })).toBeVisible();
 
 	await open(page, '/recipes/new/form');
+	await page.getByLabel('Add a tag').fill('Wee');
 	await expect(page.getByRole('group', { name: 'Tag suggestions' }).getByRole('button', { name: 'Weeknight' })).toBeVisible();
 });
 
@@ -253,6 +299,8 @@ test('tags: suggestions add a tag, a typed name equal to an existing tag reuses 
 
 // The nav comes from the app layout; the guard reacts to any in-app link, so one is added when the layout has none.
 async function planLink(page: Page) {
+	// the phone bar is hidden and inert while a text field has focus
+	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 	const link = page.getByRole('link', { name: 'Plan', exact: true });
 	if ((await link.count()) === 0) {
 		await page.evaluate(() => {
@@ -321,15 +369,66 @@ test('Cancel with changes asks first as well', async ({ page }) => {
 	await expect(page.getByRole('alertdialog', { name: 'Discard changes?' })).toBeVisible();
 });
 
+async function closeAsks(page: Page) {
+	const dialog = page.waitForEvent('dialog');
+	await page.close({ runBeforeUnload: true });
+	expect((await dialog).type()).toBe('beforeunload');
+	await (await dialog).dismiss();
+}
+
 test('closing the tab with unsaved changes asks the browser to confirm, a saved form does not', async ({ page }) => {
 	await open(page, '/recipes/new/form');
 	await page.getByLabel('Title', { exact: true }).fill('Draft');
+	// the draft keeps the title but not a half-typed tag
+	await page.getByLabel('Add a tag').fill('Sunday');
 
-	const dialog = page.waitForEvent('dialog');
+	await closeAsks(page);
+});
+
+test('closing the tab on a new recipe whose draft holds everything does not ask', async ({ page }) => {
+	await open(page, '/recipes/new/form');
+	await page.getByLabel('Title', { exact: true }).fill('Draft');
+	await page.getByLabel('Add a tag').fill('Sunday');
+	await page.keyboard.press('Enter');
+	await expect.poll(() => page.evaluate(() => localStorage.getItem('cooking-hub:recipe-draft') ?? '')).toContain('Sunday');
+	const asked: string[] = [];
+	page.on('dialog', (dialog) => {
+		asked.push(dialog.type());
+		void dialog.dismiss();
+	});
+
 	await page.close({ runBeforeUnload: true });
 
-	expect((await dialog).type()).toBe('beforeunload');
-	await (await dialog).dismiss();
+	await expect.poll(() => page.isClosed()).toBe(true);
+	expect(asked).toEqual([]);
+});
+
+test('closing the tab asks when a photo is chosen on a new recipe, since the draft cannot keep the file', async ({ page }) => {
+	await open(page, '/recipes/new/form');
+	const image = await sharp({ create: { width: 64, height: 40, channels: 3, background: '#c05030' } }).jpeg().toBuffer();
+	await page.getByLabel('Photo file').setInputFiles({ name: 'photo.jpg', mimeType: 'image/jpeg', buffer: image });
+
+	await closeAsks(page);
+});
+
+test('closing the tab asks when the browser blocks storage, since no draft is kept', async ({ page }) => {
+	await page.addInitScript(() => {
+		Storage.prototype.setItem = () => {
+			throw new DOMException('blocked', 'SecurityError');
+		};
+	});
+	await open(page, '/recipes/new/form');
+	await page.getByLabel('Title', { exact: true }).fill('Draft');
+
+	await closeAsks(page);
+});
+
+test('closing the tab with unsaved changes asks the browser to confirm on an edit page', async ({ page, request }) => {
+	const { recipes } = await seed(request, { recipes: [{ title: 'Soup' }] });
+	await open(page, `/recipes/${recipes[0]}/edit`);
+	await page.getByLabel('Title', { exact: true }).fill('Draft');
+
+	await closeAsks(page);
 });
 
 test('the discard dialog animates in, and not under reduced motion', async ({ page }) => {
@@ -341,7 +440,7 @@ test('the discard dialog animates in, and not under reduced motion', async ({ pa
 			() =>
 				new Promise<number>((done) =>
 					requestAnimationFrame(() =>
-						done(document.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSTransition)).length)
+						done(document.getAnimations().filter((a) => a.playState === 'running' && !(a instanceof CSSTransition) && (a.effect as KeyframeEffect).getKeyframes().some((k) => ['transform', 'translate', 'scale', 'rotate', 'backgroundPosition'].some((p) => p in k))).length)
 					)
 				)
 		);
@@ -356,4 +455,23 @@ test('the discard dialog animates in, and not under reduced motion', async ({ pa
 	await (await planLink(page)).click();
 	await expect(page.getByRole('alertdialog')).toBeVisible();
 	expect(await running()).toBe(0);
+});
+
+test('While saving the one Save reads "Saving…" and is disabled', async ({ page }) => {
+	await open(page, '/recipes/new/form');
+	await page.getByLabel('Title', { exact: true }).fill('Soup');
+	let release!: () => void;
+	const held = new Promise<void>((done) => (release = done));
+	await page.route('**/recipes/new/form', async (route) => {
+		if (route.request().method() !== 'POST') return route.continue();
+		await held;
+		await route.continue();
+	});
+
+	await page.getByRole('button', { name: 'Save recipe' }).click();
+
+	const saving = page.getByRole('button', { name: /Saving/ });
+	await expect(saving).toBeDisabled();
+	release();
+	await expect(page).toHaveURL(/\/recipes\/\d+$/);
 });

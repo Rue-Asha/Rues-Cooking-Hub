@@ -7,8 +7,10 @@ TBD - created by archiving change build-cooking-hub. Update Purpose after archiv
 `/plan?week=<monday>` SHALL show one week Monday–Sunday (default: the week containing today) with the slots Breakfast,
 Lunch, Dinner and Snacks per day, any number of entries per slot in position order, today highlighted
 (`data-today`), and the controls previous week, next week and "This week". Each empty slot SHALL show an add
-affordance. On phone the days SHALL be stacked vertically; at 1280 the full 7-day grid SHALL be visible next to the
-recipe rail.
+affordance. On phone the days SHALL be stacked vertically; at 1280 the week SHALL be a grid with the days as rows and
+the four slots as columns (gate 4, "Desktop week states"), the first day starting inside the viewport and every day
+left of the recipe rail. (Verify round 1: the old "seven days start at the same top edge" described the earlier
+columns layout, which gate 4 replaced with rows.)
 
 #### Scenario: Week query returns entries in day, slot and position order
 - **WHEN** entries are added on Tuesday Dinner (two), Monday Snacks and Monday Breakfast and the week is read
@@ -37,7 +39,7 @@ recipe rail.
 
 #### Scenario: Phone stacks the days and desktop shows the grid
 - **WHEN** `/plan` is opened on phone and on desktop
-- **THEN** on phone each day starts below the previous one; on desktop all seven days start at the same top edge within the viewport width, next to the recipe rail
+- **THEN** on phone each day starts below the previous one; on desktop each day starts below the previous one as a row whose four slots sit side by side at one top edge, the first day starts inside the viewport, and every day fits the viewport width left of the recipe rail
 - **proof:** e2e
 
 ### Requirement: Plan entries
@@ -156,5 +158,94 @@ change nothing; if the shown week has entries, a confirm SHALL come first.
 #### Scenario: Nothing to copy
 - **WHEN** "Copy week" is used while the previous week is empty
 - **THEN** "Nothing to copy" is shown and the week is unchanged
+- **proof:** e2e
+
+### Requirement: Desktop week states
+From the posture switch (1024 px) `/plan` SHALL show the shown week as 7 days × 4 slots, the days as rows and the slots as columns (gate 4), with the recipe picker aside as the drag source (hidden on touch devices, where the add controls and menus do the job), the slot Add dialog, the entry options (Change servings or Edit text, Move to…, Delete), Copy week, Previous week / Next week / This week and `?week=`, with the behaviour of the existing plan requirements, styled with fingerprint roles only. Every state SHALL stay readable without horizontal page scroll: an empty week, a slot with five or more entries, long free text and entries whose recipe was deleted (shown as text). Every drag SHALL keep its Move to… alternative.
+
+#### Scenario: Empty week offers an add control in every slot
+- **WHEN** an empty week is opened at 1280×800
+- **THEN** 28 slots are shown, each with an add control named "Add to <Weekday> <Slot>", and the recipe picker named "Recipes" is visible
+- **proof:** e2e
+
+#### Scenario: Slot with five entries stays readable
+- **WHEN** Wednesday Dinner holds five recipe entries with 120-character titles and one free text of 200 characters, at 1280×800 and at 1024×768
+- **THEN** all six entries and their "Options for <title>" controls are visible inside the Wednesday column, and the document's `scrollWidth` is at most its `clientWidth`
+- **proof:** e2e
+
+#### Scenario: Entry of a deleted recipe reads as text
+- **WHEN** a planned recipe is deleted and `/plan` is opened at 1280×800
+- **THEN** its entry shows the recipe's title as free text with "Edit text" in its options
+- **proof:** e2e
+
+#### Scenario: Picker shows the plate and No times for a bare recipe
+- **WHEN** at 1280×800 the archive holds "Weeknight dal" with no photo and no times and "Village salad" with 10 minutes
+- **THEN** the picker shows "Weeknight dal" with the plate of its first letter "W" (the Recipes list's monogram, signed hi-fi) and "No times", and "Village salad" with "10 min" (verify round 3)
+- **proof:** e2e
+
+#### Scenario: Every drag has a Move to alternative on the desktop
+- **WHEN** at 1280×800 an entry's options are opened by keyboard and "Move to…" moves it to Friday Lunch
+- **THEN** the entry is in Friday Lunch after a reload, without any pointer drag
+- **proof:** e2e
+
+### Requirement: Plan on the phone
+Below the posture switch (phones and tablets, 768–1023 px included, gate 4) `/plan` SHALL stack the seven days vertically in one column, each day with its four slots, today marked with `aria-current="date"` and scrolled to the top of the view on load when the shown week contains today (otherwise the view starts at Monday). An empty day SHALL render compact (shorter than a day with one entry) while still offering its four add controls. A day whose last entry is deleted or moved away SHALL keep its layout until that entry has faded out, and only then turn compact, its add controls settling into their places; under reduced motion it turns compact at once (verify round 3). Every action SHALL be reachable through menus and dialogs; no action SHALL need a drag.
+
+#### Scenario: Days are stacked on the phone
+- **WHEN** `/plan` is opened at 390×844
+- **THEN** the seven days appear top to bottom in Monday-to-Sunday order, each day's left edge at the same x, and no day sits beside another
+- **proof:** e2e
+
+#### Scenario: Tablet width stacks the days in one column
+- **WHEN** `/plan` is opened at 768×1024 and at 1023×768
+- **THEN** the seven days appear top to bottom in one column with the same left edge, and no recipe picker is shown
+- **proof:** e2e
+
+#### Scenario: Picker is hidden on touch at desktop width
+- **WHEN** `/plan` is opened at 1280×800 in a touch context (coarse pointer)
+- **THEN** no recipe picker is shown and every slot still offers its "Add to <Weekday> <Slot>" control
+- **proof:** e2e
+
+#### Scenario: Today is marked and first in view
+- **WHEN** the test clock is set to a Thursday and `/plan` is opened at 390×844
+- **THEN** Thursday carries `aria-current="date"` and its heading is inside the viewport's top third without scrolling by the user
+- **proof:** e2e
+
+#### Scenario: Past week starts at Monday
+- **WHEN** `/plan?week=<a date four weeks back>` is opened at 390×844
+- **THEN** no day carries `aria-current="date"` and the page is scrolled to the top with Monday visible
+- **proof:** e2e
+
+#### Scenario: Empty days are compact
+- **WHEN** a week with entries only on Tuesday is opened at 390×844
+- **THEN** Monday's height is less than Tuesday's, and Monday still offers the four add controls "Add to Monday Breakfast" … "Add to Monday Snacks"
+- **proof:** e2e
+
+#### Scenario: A day turns compact once its last entry is gone
+- **WHEN** at 375×812 the only entry of Sunday is deleted from its options menu, once with motion and once with reduced motion
+- **THEN** in no frame do Sunday's add controls overlap each other; with motion Sunday keeps its full layout in every frame while the entry fades and is compact from the first frame without it, ending with its four add controls; with reduced motion the entry is gone and the day is compact right after the delete
+- **proof:** e2e
+
+#### Scenario: Phone plan works without drag
+- **WHEN** at 390×844 a recipe entry is added through an add control, its servings changed, moved with "Move to…" to Saturday Dinner and deleted from its options menu
+- **THEN** each step is reflected after a reload and no step used a drag
+- **proof:** e2e
+
+### Requirement: Context add on Plan
+The phone bar's "+" on `/plan`, and `/plan?add=1` (the Home choice sheet's "Plan entry"), SHALL open the existing Add dialog for today's Dinner when the shown week contains today, otherwise for Monday Dinner of the shown week; the dialog stays bound to that one slot (no day or meal choice inside it). After opening from `?add=1` the flag SHALL be removed from the URL (history replaced) so a reload does not reopen the dialog.
+
+#### Scenario: Plus on Plan opens the Add dialog for today
+- **WHEN** the test clock is set to a Wednesday and the "+" is tapped on `/plan` at 390×844
+- **THEN** the dialog named "Add to Wednesday Dinner" opens with the choice "Recipe" or "Free text"
+- **proof:** e2e
+
+#### Scenario: Plus on another week targets Monday Dinner
+- **WHEN** `/plan?week=<next week's Monday>` is opened at 390×844 and the "+" is tapped
+- **THEN** the dialog named "Add to Monday Dinner" opens and adding "Pizza night" puts it into next week's Monday Dinner
+- **proof:** e2e
+
+#### Scenario: Plan entry from the Home sheet opens the Add dialog
+- **WHEN** at 390×844 the "+" is tapped on `/`, "Plan entry" chosen, and after the dialog appeared the page is reloaded
+- **THEN** `/plan` is shown with the Add dialog for today's Dinner; after the reload the URL has no `add` parameter and no dialog is open
 - **proof:** e2e
 

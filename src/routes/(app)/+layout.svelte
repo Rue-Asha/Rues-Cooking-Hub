@@ -1,9 +1,14 @@
 <script lang="ts">
+	import '#lib/styles/fingerprint/tokens.css';
+	import '#lib/styles/fingerprint/fonts.css';
+	import '#lib/styles/fingerprint/base.css';
+	import '#lib/styles/fingerprint/motion.css';
+	import '#lib/styles/fingerprint/layout.css';
 	import type { Snippet } from 'svelte';
 	import { onNavigate } from '$app/navigation';
 	import { viewTransition } from '#lib/motion.ts';
 	import { activeArea } from '#lib/nav.ts';
-	import AppNav from '#lib/shell/AppNav.svelte';
+	import Shell from '#lib/shell/Shell.svelte';
 
 	let { children }: { children: Snippet } = $props();
 
@@ -19,34 +24,49 @@
 	});
 </script>
 
-<AppNav />
-
-<main>
+<Shell>
 	{@render children()}
-</main>
+</Shell>
 
 <style>
-	main {
-		overflow-x: clip;
-		padding-block: calc(14px + var(--nav-h) + var(--s-8)) var(--s-11);
+	/* long recipe and spot names break anywhere but never at a hyphenation point */
+	:global(:is(h1, h2, .type-display-xl, .type-display-l, .type-display-m)) {
+		hyphens: manual;
+		overflow-wrap: anywhere;
 	}
 
-	@media (max-width: 1023px) {
-		main {
-			padding-block: var(--s-7) calc(var(--tabbar-h) + max(12px, env(safe-area-inset-bottom)) + var(--s-7));
-		}
+	/* the I-beam promises an edit: chrome and reading text show the arrow, only fields keep the text cursor.
+	   Nothing on the screen starts a selection or the long-press callout, like a native app; fields and what the user
+	   wrote themselves (the recipe's ingredients, method and notes, a spot's notes and address: [data-prose]) opt back in. */
+	:global(html) {
+		cursor: default;
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+	}
+
+	:global(:is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='button'], [type='submit'], [type='file']), textarea, [contenteditable='true'], [contenteditable=''])) {
+		cursor: text;
+	}
+
+	/* Safari won't let you type into an unselectable field */
+	:global(:is(input, textarea, select, [contenteditable='true'], [contenteditable=''], [data-prose])) {
+		-webkit-user-select: text;
+		user-select: text;
+		-webkit-touch-callout: default;
 	}
 
 	:global(::view-transition-old(root)) {
-		animation: var(--d-fast) var(--ease-out) both page-out;
+		animation: var(--motion-quick) var(--ease-out) both page-out;
 	}
 
 	:global(::view-transition-new(root)) {
-		animation: var(--d-slow) var(--ease-out) 60ms both page-in;
+		animation: var(--motion-settle) var(--ease-out) both page-in;
+		animation-delay: var(--motion-stagger);
 	}
 
 	:global(::view-transition-group(*.recipe-hero)) {
-		animation-duration: 520ms;
+		animation-duration: var(--motion-settle);
 		animation-timing-function: var(--ease-out);
 	}
 
@@ -55,7 +75,7 @@
 	:global(::view-transition-new(*.recipe-hero)) {
 		block-size: 100%;
 		object-fit: cover;
-		animation-duration: 520ms;
+		animation-duration: var(--motion-settle);
 	}
 
 	@keyframes -global-page-out {

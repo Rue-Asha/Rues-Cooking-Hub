@@ -17,6 +17,8 @@ export interface RecipeFormDraft {
 export interface StoredDraft {
 	v: 1;
 	imported: boolean;
+	// the site a read import came from, for its "Read from" status after a restore
+	host?: string;
 	form: RecipeFormDraft;
 }
 
@@ -24,11 +26,13 @@ export type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 const KEY = 'cooking-hub:recipe-draft';
 
-export function saveDraft(storage: DraftStorage, draft: StoredDraft): void {
+// false when storage is blocked or full and the draft was not kept
+export function saveDraft(storage: DraftStorage, draft: StoredDraft): boolean {
 	try {
 		storage.setItem(KEY, JSON.stringify(draft));
+		return true;
 	} catch {
-		// blocked storage: no draft
+		return false;
 	}
 }
 
@@ -54,7 +58,7 @@ export function loadDraft(storage: DraftStorage): StoredDraft | null {
 		const raw = storage.getItem(KEY);
 		if (raw === null) return null;
 		const parsed = JSON.parse(raw);
-		if (parsed?.v !== 1 || typeof parsed.imported !== 'boolean' || !isFormShape(parsed.form)) return null;
+		if (parsed?.v !== 1 || typeof parsed.imported !== 'boolean' || (parsed.host !== undefined && typeof parsed.host !== 'string') || !isFormShape(parsed.form)) return null;
 		return parsed as StoredDraft;
 	} catch {
 		return null;

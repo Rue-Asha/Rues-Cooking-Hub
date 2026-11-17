@@ -3,7 +3,7 @@ import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OnNavigate } from '$app/navigation';
-import { flipOptions, heroName, pop, reducedMotion, rise, slideOut, stagger, viewTransition } from './motion.ts';
+import { arrive, bezier, flipOptions, heroName, pop, reducedMotion, rise, slideOut, stagger, viewTransition } from './motion.ts';
 
 function prefersReduced(reduce: boolean) {
 	vi.stubGlobal('matchMedia', (query: string) => ({
@@ -31,16 +31,16 @@ function sourceFiles(dir: string): string[] {
 	});
 }
 
-const files = sourceFiles(srcDir).map((path) => {
-	const text = readFileSync(path, 'utf8');
-	const styles = path.endsWith('.css') ? [text] : [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
-	return { path, name: relative(srcDir, path), text, css: styles.join('\n').replace(/\/\*[\s\S]*?\*\//g, '') };
-});
+const files = sourceFiles(srcDir)
+	.filter((path) => !path.includes('/styles/fingerprint/'))
+	.map((path) => {
+		const text = readFileSync(path, 'utf8');
+		const styles = path.endsWith('.css') ? [text] : [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
+		return { path, name: relative(srcDir, path), text, css: styles.join('\n').replace(/\/\*[\s\S]*?\*\//g, '') };
+	});
 
-// movement and entrances animate transform and opacity; these are the documented exceptions (design-system spec)
+// movement and entrances animate transform and opacity; state colours are the documented exception (design-system spec)
 const stateColours = ['color', 'background', 'background-color', 'border-color', 'box-shadow', 'outline-color', 'fill', 'stroke'];
-const heightExceptions = ['lib/recipes/SectionsEditor.svelte'];
-const inlineSizeExceptions = ['lib/shell/AppNav.svelte', 'lib/ui/PillNav.svelte'];
 
 function topLevel(list: string): string[] {
 	const out: string[] = [];
@@ -79,11 +79,10 @@ function offenders(): string[] {
 		for (const entry of animatedProperties(f.css, f.name)) {
 			const prop = entry.split(' ').pop()!;
 			if (allowed.includes(prop) || stateColours.includes(prop)) continue;
-			if (prop === 'inline-size' && inlineSizeExceptions.includes(f.name)) continue;
 			out.push(entry);
 		}
 		for (const m of f.text.matchAll(/\b(?:transition|in|out):(slide|blur|draw)\b/g))
-			if (!heightExceptions.includes(f.name)) out.push(`${f.name}: ${m[1]} transition`);
+			out.push(`${f.name}: ${m[1]} transition`);
 	}
 	return out;
 }
@@ -97,7 +96,12 @@ function stateColourKeyframes(): string[] {
 }
 
 const node = {} as Element;
-const primitives = { rise: () => rise(node, { delay: 80, y: 20 }), pop: () => pop(node), slideOut: () => slideOut(node) };
+const primitives = {
+	rise: () => rise(node, { delay: 80, y: 20 }),
+	arrive: () => arrive(node, { delay: 40 }),
+	pop: () => pop(node),
+	slideOut: () => slideOut(node)
+};
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -185,6 +189,15 @@ describe('motion', () => {
 		vi.stubGlobal('document', { startViewTransition: start });
 		await viewTransition(navigation);
 		expect(start).toHaveBeenCalledOnce();
+	});
+
+	it('bezier follows the fingerprint curves and keeps its ends', () => {
+		const out = bezier(0.23, 1, 0.32, 1);
+		expect(out(0)).toBe(0);
+		expect(out(1)).toBe(1);
+		expect(out(0.25)).toBeGreaterThan(0.6);
+		const linear = bezier(0.25, 0.25, 0.75, 0.75);
+		expect(linear(0.4)).toBeCloseTo(0.4, 3);
 	});
 
 	it('heroName names the shared hero element', () => {

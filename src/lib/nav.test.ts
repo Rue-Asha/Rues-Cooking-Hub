@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { activeArea, areas, headerActions } from './nav.ts';
+import { activeArea, areas, headerActions, plusHidden, POSTURE_SWITCH } from './nav.ts';
 
 describe('nav', () => {
-	it('Scenario: Active area is marked', () => {
+	it('Scenario: Active area is derived for sub-routes', () => {
 		expect(
 			[
 				'/',
 				'/recipes/12',
 				'/recipes/new/form',
+				'/recipes/tags',
 				'/plan',
 				'/list',
 				'/eating-out',
@@ -15,7 +16,7 @@ describe('nav', () => {
 				'/eating-out/3',
 				'/eating-out/3/edit'
 			].map(activeArea)
-		).toEqual(['home', 'recipes', 'recipes', 'plan', 'list', 'eating-out', 'eating-out', 'eating-out', 'eating-out']);
+		).toEqual(['home', 'recipes', 'recipes', 'recipes', 'plan', 'list', 'eating-out', 'eating-out', 'eating-out', 'eating-out']);
 	});
 
 	it('matches whole segments only', () => {
@@ -31,7 +32,6 @@ describe('nav', () => {
 			['list', '/list', 'List'],
 			['eating-out', '/eating-out', 'Eating Out']
 		]);
-		expect(areas.filter((a) => a.divider).map((a) => a.area)).toEqual(['eating-out']);
 	});
 
 	it('Scenario: Header actions per area', () => {
@@ -44,5 +44,17 @@ describe('nav', () => {
 			search: { label: 'Search spots', href: '/eating-out#search' },
 			add: { label: 'Add spot', href: '/eating-out/new' }
 		});
+	});
+
+	it('hides the plus on the recipe form routes only', () => {
+		expect(['/recipes/new', '/recipes/new/form', '/recipes/12/edit'].map(plusHidden)).toEqual([true, true, true]);
+		expect(['/', '/recipes', '/recipes/12', '/recipes/tags', '/plan', '/list', '/eating-out/new', '/eating-out/3/edit'].map(plusHidden)).toEqual(
+			Array(8).fill(false)
+		);
+	});
+
+	it('keeps the posture switch at 1024 and labels Eating Out "Spots" on the phone', () => {
+		expect(POSTURE_SWITCH).toBe(1024);
+		expect(areas.map((a) => a.phoneLabel)).toEqual(['Home', 'Recipes', 'Plan', 'List', 'Spots']);
 	});
 });

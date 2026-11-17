@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { enhance, type SubmitFunction } from '$app/forms';
+	import Button from '#lib/components/button/Button.svelte';
+	import Field from '#lib/components/field/Field.svelte';
 	import { rise } from '#lib/motion.ts';
 	import { formatAmounts } from '#lib/shopping/aggregate.ts';
 	import type { ShoppingItem } from '#lib/types.ts';
-	import Button from '#lib/ui/Button.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 
 	let {
@@ -35,18 +36,22 @@
 	const ownPart = $derived(formatAmounts(item.origin === 'manual' ? item.manualAmounts : item.planAmounts));
 	const planPart = $derived(item.origin === 'manual' ? formatAmounts(item.planAmounts) : '');
 
-	let nameInput: HTMLInputElement | undefined = $state();
-
 	$effect(() => {
-		if (!editing || !nameInput) return;
-		nameInput.focus();
-		nameInput.select();
+		if (!editing) return;
+		const input = document.getElementById(`name-${item.id}`) as HTMLInputElement | null;
+		input?.focus();
+		input?.select();
 	});
 
 	function onkeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			oncancel();
+		} else if (event.key === 'Enter' && !event.isComposing) {
+			// implicit submission would press the first submit button in the form, which is Delete
+			event.preventDefault();
+			const form = (event.currentTarget as HTMLInputElement).form;
+			form?.requestSubmit(form.querySelector<HTMLButtonElement>('button[type="submit"]:not([formaction])'));
 		}
 	}
 </script>
@@ -55,19 +60,23 @@
 	<form class="check-form" method="POST" action="?/check" use:enhance={submitCheck}>
 		<input type="hidden" name="id" value={item.id} />
 		<input type="hidden" name="checked" value={item.checked ? '0' : '1'} />
-		<button class="check" role="checkbox" aria-checked={done} aria-label={item.name}>
+		<button class="check" role="checkbox" aria-checked={done} aria-label={item.name} data-check={item.id} data-press="round">
 			<span class="box" aria-hidden="true">
 				<span class="fill"></span>
 				<span class="tick"><Icon name="check" size={14} stroke={2.4} /></span>
 			</span>
 		</button>
 	</form>
-	<button type="button" class="main" aria-label="Edit {item.name}" aria-expanded={editing} onclick={onedit}>
-		<span class="name">
-			<span class="text">{item.name}<span class="strike" data-strike></span></span>
-			{#if item.origin === 'plan'}<span class="from" title="From the plan"><Icon name="calendar" size={13} /></span>{/if}
+	<button type="button" class="main" aria-label="Edit {item.name}" aria-expanded={editing} data-edit={item.id} onclick={onedit}>
+		<span class="text-col">
+			<span class="name" dir="auto">
+				<span class="text">{item.name}</span>
+			</span>
+			{#if item.origin === 'plan'}
+				<span class="from"><Icon name="calendar" size={13} />From the plan</span>
+			{/if}
 		</span>
-		<span class="amount tnum">
+		<span class="amount">
 			{#key amount}<span class="value" in:rise={{ y: 6 }}>{amount}</span>{/key}
 			{#if planPart}<span class="extra">incl. {planPart} from plan</span>{/if}
 		</span>
@@ -76,12 +85,13 @@
 		type="button"
 		class="move"
 		data-move={item.id}
+		data-press="round"
 		aria-label="Move {item.name} to another category"
 		aria-haspopup="menu"
 		aria-expanded={moving}
 		onclick={(e) => onmove(e.currentTarget)}
 	>
-		<Icon name="dots" size={18} />
+		<Icon name="tag" size={18} />
 	</button>
 </div>
 
@@ -96,42 +106,35 @@
 	>
 		<input type="hidden" name="id" value={item.id} />
 		<div class="fields">
-			<div class="field">
-				<label for="name-{item.id}">Name</label>
-				<input id="name-{item.id}" name="name" value={item.name} autocomplete="off" bind:this={nameInput} {onkeydown} />
-			</div>
-			<div class="field">
-				<label for="amount-{item.id}">Amount</label>
-				<input
-					id="amount-{item.id}"
-					name="amount"
-					value={ownPart}
-					placeholder="e.g. 200 g"
-					autocomplete="off"
-					{onkeydown}
-					aria-invalid={error ? 'true' : undefined}
-					aria-describedby={error ? `amount-error-${item.id}` : undefined}
-				/>
-			</div>
+			<Field id="name-{item.id}" name="name" label="Name" value={item.name} autocomplete="off" {onkeydown} />
+			<Field
+				id="amount-{item.id}"
+				name="amount"
+				label="Amount"
+				value={ownPart}
+				placeholder="e.g. 200 g"
+				autocomplete="off"
+				{onkeydown}
+				error={error ?? undefined}
+			/>
 		</div>
 		{#if planPart}<p class="plan-part"><Icon name="calendar" size={14} />From plan: {planPart}</p>{/if}
-		{#if error}<p class="error" id="amount-error-{item.id}" role="alert" transition:rise={{ y: 6 }}>{error}</p>{/if}
 		<div class="actions">
-			<button type="submit" class="delete" formaction="?/delete"><Icon name="trash" size={18} />Delete</button>
+			<Button variant="danger" type="submit" formaction="?/delete"><Icon name="trash" size={18} />Delete</Button>
 			<span class="spacer"></span>
-			<Button variant="secondary" arrow={false} onclick={oncancel}>Cancel</Button>
-			<Button variant="olive" type="submit" arrow={false}>Save</Button>
+			<Button onclick={oncancel}>Cancel</Button>
+			<Button variant="primary" type="submit">Save</Button>
 		</div>
 	</form>
 {/if}
 
 <style>
 	.row {
-		display: grid;
-		grid-template-columns: 44px 1fr 44px;
-		align-items: center;
-		gap: 4px;
-		min-block-size: 52px;
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-1);
+		min-inline-size: 0;
+		min-block-size: max(var(--control-height), var(--target));
 	}
 
 	.check-form {
@@ -141,25 +144,33 @@
 	.check {
 		display: grid;
 		place-items: center;
-		inline-size: 44px;
-		block-size: 44px;
-		margin-inline-start: -10px;
+		flex: none;
+		inline-size: max(var(--control-height-xs), var(--target-touch));
+		block-size: max(var(--control-height), var(--target-touch));
 		padding: 0;
 		border: 0;
-		border-radius: var(--r-pill);
+		border-radius: var(--radius-round);
 		background: none;
+		cursor: pointer;
+	}
+
+	.check:focus-visible,
+	.main:focus-visible,
+	.move:focus-visible {
+		outline: var(--focus-width) solid var(--focus-ring);
+		outline-offset: calc(-1 * var(--focus-width));
 	}
 
 	.box {
 		position: relative;
 		display: grid;
 		place-items: center;
-		inline-size: 24px;
-		block-size: 24px;
-		border-radius: var(--r-pill);
-		border: 1.5px solid var(--stone);
-		color: var(--white);
-		transition: border-color var(--d-fast) var(--ease-out);
+		inline-size: var(--space-6);
+		block-size: var(--space-6);
+		border-radius: var(--radius-round);
+		background: var(--surface-raised);
+		box-shadow: var(--ring-control);
+		color: var(--ink-on-inverse);
 	}
 
 	.fill,
@@ -169,220 +180,205 @@
 
 	.fill {
 		position: absolute;
-		inset: -1.5px;
+		inset: 0;
 		border-radius: inherit;
-		background: var(--olive);
+		background: var(--surface-inverse);
 		transform: scale(0);
-		transition: transform var(--d-base) var(--ease-spring);
+		transition: transform var(--motion-glide) var(--ease-out);
 	}
 
 	.tick {
+		position: relative;
 		display: grid;
-		transform: scale(0.4);
 		opacity: 0;
-		transition:
-			transform var(--d-base) var(--ease-spring) 60ms,
-			opacity var(--d-fast) var(--ease-out) 60ms;
+		transition: opacity var(--motion-quick) var(--ease-out);
 	}
 
-	.done .box {
-		border-color: var(--olive);
-	}
-
-	.done .fill,
-	.done .tick {
+	.done .fill {
 		transform: scale(1);
-		opacity: 1;
 	}
 
-	.check:active .box {
-		transform: scale(0.9);
+	.done .tick {
+		opacity: 1;
 	}
 
 	.main {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--s-3);
-		min-block-size: 44px;
+		flex: 1;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: var(--space-0-5) var(--space-3);
+		min-block-size: max(var(--control-height), var(--target-touch));
 		min-inline-size: 0;
-		padding: 0;
+		padding: var(--space-2-5) var(--space-1);
 		border: 0;
-		border-radius: var(--r-xs);
+		border-radius: var(--radius-text);
 		background: none;
+		color: inherit;
+		font: inherit;
 		text-align: start;
+		cursor: pointer;
+	}
+	/* the row answers the finger before the editor opens */
+	.main:active {
+		background: var(--surface-tint);
+	}
+
+	/* a short basis keeps a short amount ("1 bottle") beside the name in the narrow Checked card; a long one still wraps */
+	.text-col {
+		display: grid;
+		flex: 1 1 4rem;
+		gap: var(--space-0-5);
+		min-inline-size: 0;
+	}
+
+	.name {
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		font-weight: var(--weight-medium);
+		overflow-wrap: anywhere;
+	}
+
+	.text {
+		position: relative;
+		transition: opacity var(--motion-glide) var(--ease-out);
+	}
+
+	.done .text {
+		text-decoration: line-through;
+		text-decoration-thickness: var(--stroke-rule);
+	}
+
+	.done .text,
+	.done .amount {
+		opacity: 0.7;
+	}
+
+	.from {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
+		color: var(--ink-secondary);
+	}
+
+	.amount {
+		display: grid;
+		justify-items: end;
+		flex: 0 1 auto;
+		margin-inline-start: auto;
+		max-inline-size: 100%;
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-body-s-line);
+		font-variant-numeric: var(--numeric-figures);
+		text-align: end;
+		overflow-wrap: anywhere;
+		transition: opacity var(--motion-glide) var(--ease-out);
+	}
+
+	.extra {
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
+		color: var(--ink-secondary);
 	}
 
 	.move {
 		display: grid;
 		place-items: center;
-		inline-size: 44px;
-		block-size: 44px;
-		margin-inline-end: -12px;
+		flex: none;
+		inline-size: max(var(--control-height-xs), var(--target-touch));
+		block-size: max(var(--control-height), var(--target-touch));
 		padding: 0;
 		border: 0;
-		border-radius: var(--r-pill);
+		border-radius: var(--radius-round);
 		background: none;
-		color: var(--stone);
-		transition:
-			color var(--d-fast) var(--ease-out),
-			background-color var(--d-fast) var(--ease-out);
+		color: var(--ink-secondary);
+		cursor: pointer;
 	}
 
-	.move:hover,
 	.move[aria-expanded='true'] {
+		background: var(--surface-tint-strong);
 		color: var(--ink);
-		background: var(--ink-wash);
 	}
 
-	.name {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		min-inline-size: 0;
-		font-size: 15px;
-		font-weight: 500;
+	@media (hover: hover) {
+		.move:hover {
+			background: var(--surface-tint);
+			color: var(--ink);
+		}
 	}
 
-	.text {
-		position: relative;
-		overflow-wrap: anywhere;
-		transition: opacity var(--d-base) var(--ease-out);
+	/* the Checked card is the screen's charcoal one */
+	:global([data-surface='inverse']) .box {
+		background: none;
+		box-shadow: var(--ring-control-on-inverse);
+		color: var(--ink);
 	}
 
-	/* drawn left to right as the box fills */
-	.strike {
-		position: absolute;
-		inset-inline: -2px;
-		inset-block-start: calc(50% - 0.75px);
-		block-size: 1.5px;
-		border-radius: 1px;
-		background: var(--ink-2);
-		transform: scaleX(0);
-		transform-origin: left center;
-		transition: transform var(--d-base) var(--ease-out) 80ms;
-		pointer-events: none;
+	:global([data-surface='inverse']) .fill {
+		background: var(--surface-raised);
 	}
 
-	.done .strike {
-		transform: scaleX(1);
+	:global([data-surface='inverse']) .from,
+	:global([data-surface='inverse']) .extra,
+	:global([data-surface='inverse']) .move {
+		color: var(--ink-on-inverse-secondary);
 	}
 
-	.done .text,
-	.done .amount {
-		opacity: 0.6;
+	:global([data-surface='inverse']) .move[aria-expanded='true'],
+	:global([data-surface='inverse']) .move:hover {
+		background: var(--surface-inverse-tint-strong);
+		color: var(--ink-on-inverse);
 	}
 
-	.from {
-		display: inline-grid;
-		color: var(--stone);
-	}
-
-	.amount {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		flex: none;
-		font-size: 15px;
-		transition: opacity var(--d-base) var(--ease-out);
-	}
-
-	.value {
-		display: inline-block;
-	}
-
-	.extra {
-		font-size: 12px;
-		color: var(--olive);
+	:global([data-surface='inverse']) .check:focus-visible,
+	:global([data-surface='inverse']) .main:focus-visible,
+	:global([data-surface='inverse']) .move:focus-visible {
+		outline-color: var(--focus-ring-on-inverse);
 	}
 
 	.editor {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-3);
-		margin: 2px 0 var(--s-3);
-		padding: var(--s-4);
-		border-radius: var(--r-md);
-		background: var(--ground);
-		box-shadow: inset 0 0 0 1px var(--line);
+		display: grid;
+		gap: var(--space-3);
+		margin-block: var(--space-1) var(--space-3);
+		padding: var(--space-3);
+		border-radius: var(--radius-panel);
+		background: var(--surface-raised);
+		box-shadow: var(--elevation-menu);
+		color: var(--ink);
 	}
 
 	.fields {
 		display: grid;
-		grid-template-columns: 3fr 2fr;
-		gap: var(--s-3);
-	}
-
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		min-inline-size: 0;
-	}
-
-	.field label {
-		font-size: var(--t-small);
-		font-weight: 600;
-	}
-
-	.field input {
-		inline-size: 100%;
-		min-block-size: 46px;
-		padding: 11px 14px;
-		border-radius: var(--r-sm);
-		border: 1px solid var(--line);
-		background: var(--white);
-		font-size: 15px;
-		transition: border-color var(--d-fast) var(--ease-out);
-	}
-
-	.field input:focus-visible {
-		border-color: var(--olive);
-		border-radius: var(--r-sm);
-	}
-
-	.field input[aria-invalid='true'] {
-		border-color: var(--brick);
+		grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+		gap: var(--space-3);
 	}
 
 	.plan-part {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		font-size: var(--t-small);
-		color: var(--olive);
-	}
-
-	.error {
-		font-size: var(--t-small);
-		font-weight: 500;
-		color: var(--brick);
+		gap: var(--space-1-5);
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
+		color: var(--ink-secondary);
 	}
 
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--s-2);
+		gap: var(--space-2);
 	}
 
 	.spacer {
 		flex: 1;
 	}
 
-	.delete {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		min-block-size: 44px;
-		padding: 0 var(--s-3);
-		margin-inline-start: calc(-1 * var(--s-3));
-		border: 0;
-		border-radius: var(--r-pill);
-		background: none;
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--brick);
+	@media (max-width: 29.99rem) {
+		.fields {
+			grid-template-columns: minmax(0, 1fr);
+		}
 	}
 
 	@media (max-width: 1023px) {

@@ -1,13 +1,19 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { enhance, type SubmitFunction } from '$app/forms';
-	import { scale } from 'svelte/transition';
-	import { reducedMotion } from '#lib/motion.ts';
+	import { pop } from '#lib/motion.ts';
 	import type { PlanEntry } from '#lib/types.ts';
+	import Button from '#lib/components/button/Button.svelte';
+	import Field from '#lib/components/field/Field.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import ImagePlaceholder from '#lib/ui/ImagePlaceholder.svelte';
+	import { clearOfBar } from '#lib/shell/clear.ts';
 	import { getBoard } from './dnd.ts';
 
 	let { entry }: { entry: PlanEntry } = $props();
+
+	// a form posts to the page's own URL minus its query; the week stays in view only when it is named again
+	const keep = $derived(page.url.searchParams.has('week') ? `&week=${page.url.searchParams.get('week')}` : '');
 
 	const board = getBoard();
 	const dragging = $derived(board.drag.item?.kind === 'entry' && board.drag.item.id === entry.id);
@@ -16,18 +22,16 @@
 
 	let mode = $state<'closed' | 'menu' | 'edit'>('closed');
 	let error = $state('');
+	let value = $state('');
 	let saving = $state(false);
 	let root: HTMLElement;
-	let trigger: HTMLButtonElement;
 	let removal: HTMLFormElement;
 
 	const close = (refocus = false) => {
 		mode = 'closed';
 		error = '';
-		if (refocus) trigger.focus();
+		if (refocus) root.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus();
 	};
-
-	const pop = (node: Element) => scale(node, { start: 0.94, duration: reducedMotion() ? 0 : 160 });
 
 	// Svelte makes the outgoing copy inert but leaves it in the accessible tree until its transition ends
 	const leaving = (e: Event) => (e.currentTarget as HTMLElement).setAttribute('aria-hidden', 'true');
@@ -96,32 +100,38 @@
 	{/if}
 	<span class="title">{title}</span>
 	{#if entry.servings !== null}
-		<span class="serv tnum" title="{entry.servings} servings">
-			<span aria-hidden="true">×{entry.servings}</span>
-			<span class="visually-hidden">{entry.servings} servings</span>
-		</span>
+		<span class="serv figures">{entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}</span>
 	{/if}
 
-	<button
-		type="button"
-		class="more"
-		bind:this={trigger}
-		aria-label="Options for {title}"
-		aria-haspopup="menu"
-		aria-expanded={mode !== 'closed'}
-		onclick={() => (mode === 'closed' ? (mode = 'menu') : close())}
-	>
-		<Icon name="dots" size={18} />
-	</button>
+	<span class="more">
+		<Button
+			variant="quiet"
+			size="xs"
+			icon
+			label="Options for {title}"
+			aria-haspopup="menu"
+			aria-expanded={mode !== 'closed'}
+			onclick={() => (mode === 'closed' ? (mode = 'menu') : close())}
+		>
+			<Icon name="dots" size={18} />
+		</Button>
+	</span>
 
-	<form method="POST" action="?/delete" use:enhance bind:this={removal} hidden>
+	<form method="POST" action="?/delete{keep}" use:enhance bind:this={removal} hidden>
 		<input type="hidden" name="id" value={entry.id} />
 	</form>
 
 	{#if mode === 'menu'}
-		<div class="menu" role="menu" aria-label="Options for {title}" transition:pop onoutrostart={leaving} onintrostart={returning} use:first>
-			<button type="button" role="menuitem" onclick={() => (mode = 'edit')}>
-				<Icon name="edit" size={18} />{entry.recipe ? 'Change servings' : 'Edit text'}
+		<div class="menu" role="menu" aria-label="Options for {title}" in:pop out:pop onoutrostart={leaving} onintrostart={returning} use:clearOfBar use:first>
+			<button
+				type="button"
+				role="menuitem"
+				onclick={() => {
+					value = entry.recipe ? String(entry.servings) : (entry.text ?? '');
+					mode = 'edit';
+				}}
+			>
+				{entry.recipe ? 'Change servings' : 'Edit text'}
 			</button>
 			<button
 				type="button"
@@ -131,8 +141,9 @@
 					board.moveTo(entry);
 				}}
 			>
-				<Icon name="move" size={18} />Move to…
+				Move to…
 			</button>
+			<hr />
 			<button
 				type="button"
 				role="menuitem"
@@ -146,23 +157,16 @@
 			</button>
 		</div>
 	{:else if mode === 'edit'}
-		<form class="menu edit" method="POST" action="?/update" use:enhance={save} transition:pop onoutrostart={leaving} onintrostart={returning} use:first>
+		<form class="menu edit" method="POST" action="?/update{keep}" use:enhance={save} in:pop out:pop onoutrostart={leaving} onintrostart={returning} use:clearOfBar use:first>
 			<input type="hidden" name="id" value={entry.id} />
 			{#if entry.recipe}
-				<label>
-					<span>Servings</span>
-					<input type="number" name="servings" inputmode="numeric" value={entry.servings} />
-				</label>
+				<Field label="Servings" name="servings" inputmode="numeric" autocomplete="off" bind:value {error} />
 			{:else}
-				<label>
-					<span>Text</span>
-					<input type="text" name="text" autocomplete="off" value={entry.text} />
-				</label>
+				<Field label="Text" name="text" autocomplete="off" bind:value {error} />
 			{/if}
-			{#if error}<p class="error" role="alert">{error}</p>{/if}
 			<div class="actions">
-				<button type="button" class="cancel" onclick={() => close(true)}>Cancel</button>
-				<button type="submit" class="save" disabled={saving}>Save</button>
+				<Button size="s" variant="quiet" onclick={() => close(true)}>Cancel</Button>
+				<Button size="s" variant="primary" type="submit" disabled={saving}>Save</Button>
 			</div>
 		</form>
 	{/if}
@@ -172,43 +176,56 @@
 	.entry {
 		position: relative;
 		display: grid;
-		grid-template-columns: 32px 1fr;
-		gap: 6px;
+		grid-template-columns: var(--thumb-size) minmax(0, 1fr) auto;
+		grid-template-areas: 'lead title title' 'lead meta act';
 		align-items: start;
-		padding: 6px;
-		border-radius: var(--r-sm);
-		background: var(--white);
-		box-shadow: var(--shadow-card);
+		column-gap: var(--space-2);
+		min-inline-size: 0;
+		padding: var(--space-1-5) var(--space-1) var(--space-1) var(--space-1-5);
+		border-radius: var(--radius-item);
+		background: var(--surface-sunken);
+		color: var(--ink);
+		transition:
+			opacity var(--motion-quick) var(--ease-out),
+			transform var(--motion-quick) var(--ease-out);
+	}
+
+	:global([data-surface='inverse']) .entry {
+		background: var(--surface-inverse-raised);
+		color: var(--ink-on-inverse);
 	}
 
 	.entry.text {
-		grid-template-columns: 1fr;
-		background: var(--sand);
-		box-shadow: none;
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-areas: 'title act';
+		padding-inline-start: var(--space-2-5);
+		background: transparent;
+		box-shadow: var(--ring-hairline);
 	}
 
-	.entry {
-		transition:
-			opacity var(--d-base) var(--ease-out),
-			transform var(--d-base) var(--ease-glide);
+	:global([data-surface='inverse']) .entry.text {
+		background: transparent;
+		box-shadow: var(--ring-on-inverse);
 	}
 
 	.entry[draggable='true'] {
 		cursor: grab;
 	}
 
-	/* the card stays behind as a faint placeholder while its tilted copy is in the air, and settles back if the drop misses */
+	/* the card stays behind as a faint placeholder while its tilted copy is in the air */
 	.entry[data-dragging] {
-		opacity: 0.35;
-		transform: scale(0.95);
+		opacity: var(--disabled-opacity);
+		box-shadow: var(--ring-control);
+		transform: scale(0.97);
 	}
 
 	.thumb {
+		grid-area: lead;
 		display: block;
-		grid-row: span 2;
-		inline-size: 32px;
-		block-size: 32px;
-		border-radius: var(--r-pill);
+		margin-block-start: var(--space-0-5);
+		inline-size: var(--thumb-size);
+		block-size: var(--thumb-size);
+		border-radius: var(--radius-round);
 		overflow: hidden;
 	}
 
@@ -219,222 +236,122 @@
 	}
 
 	.title {
-		font-size: 13px;
-		font-weight: 500;
-		line-height: 1.25;
+		grid-area: title;
+		padding-block-start: var(--space-1);
+		font-size: var(--type-body-s-size);
+		line-height: var(--type-caption-line);
+		font-weight: var(--weight-medium);
 		overflow-wrap: anywhere;
 		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
 		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 4;
+		line-clamp: 4;
 		overflow: hidden;
 	}
 
-	.text .title {
-		font-style: italic;
-	}
-
 	.serv {
-		grid-column: 2;
-		font-size: 11px;
-		color: var(--ink-2);
+		grid-area: meta;
+		align-self: center;
+		font-size: var(--type-caption-size);
+		line-height: var(--type-caption-line);
+		color: var(--ink-secondary);
+		font-variant-numeric: var(--numeric-figures);
 	}
 
-	@media (max-width: 1023px) {
-		.entry {
-			display: flex;
-			align-items: center;
-			gap: 10px;
-			min-inline-size: 0;
-			padding: 0;
-			background: none;
-			box-shadow: none;
-		}
-
-		.entry.text {
-			background: none;
-		}
-
-		.thumb {
-			flex: none;
-			inline-size: 36px;
-			block-size: 36px;
-		}
-
-		.title {
-			flex: 1;
-			min-inline-size: 0;
-			font-size: 14px;
-		}
-
-		.serv {
-			font-size: 12px;
-		}
-	}
-
-	@media (min-width: 1024px) and (max-width: 1179px) {
-		.entry {
-			grid-template-columns: 1fr;
-		}
-
-		.thumb {
-			display: none;
-		}
-
-		.serv {
-			grid-column: 1;
-		}
+	:global([data-surface='inverse']) .serv {
+		color: var(--ink-on-inverse-secondary);
 	}
 
 	.more {
-		position: absolute;
-		inset-block-start: 2px;
-		inset-inline-end: 2px;
-		display: grid;
-		place-items: center;
-		inline-size: 26px;
-		block-size: 26px;
-		border: 0;
-		border-radius: var(--r-pill);
-		background: var(--white);
-		color: var(--ink-2);
-		box-shadow: var(--shadow-card);
-		opacity: 0;
-		transition:
-			opacity var(--d-fast) var(--ease-out),
-			transform var(--d-fast) var(--ease-out);
+		grid-area: act;
+		display: flex;
+		justify-self: end;
 	}
 
-	.entry:hover .more,
-	.entry:focus-within .more,
-	.entry[data-menu-open] .more {
-		opacity: 1;
-	}
-
-	.more:hover {
-		transform: scale(1.08);
+	.entry[data-menu-open] {
+		z-index: var(--z-menu);
 	}
 
 	.menu {
 		position: absolute;
-		inset-block-start: calc(100% + 4px);
+		inset-block-start: calc(100% + var(--space-1));
 		inset-inline-end: 0;
-		z-index: 9;
-		display: flex;
-		flex-direction: column;
-		min-inline-size: 200px;
-		padding: 6px;
-		border-radius: var(--r-md);
-		border: 1px solid var(--glass-border);
-		background: var(--glass-strong);
-		backdrop-filter: var(--glass-filter);
-		-webkit-backdrop-filter: var(--glass-filter);
-		box-shadow: var(--shadow-float);
+		z-index: var(--z-menu);
+		display: grid;
+		gap: var(--space-0-5);
+		min-inline-size: 13rem;
+		padding: var(--space-1-5);
+		border-radius: var(--radius-panel);
+		background: var(--surface-raised);
+		box-shadow: var(--elevation-menu);
+		color: var(--ink);
 		transform-origin: top right;
+	}
+
+	/* the last entries of a long page: the menu opens upwards, clear of the phone bar */
+	.menu:global([data-side='above']) {
+		inset-block-start: auto;
+		inset-block-end: calc(100% + var(--space-1));
+		transform-origin: bottom right;
 	}
 
 	.menu button[role='menuitem'] {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		min-block-size: 44px;
-		padding: 0 12px;
+		gap: var(--space-2-5);
+		min-block-size: max(var(--control-height), var(--target));
+		padding-inline: var(--space-3);
 		border: 0;
-		border-radius: var(--r-sm);
+		border-radius: var(--radius-item);
 		background: none;
-		font-size: 14px;
-		font-weight: 500;
+		font-size: var(--type-body-s-size);
+		font-weight: var(--weight-medium);
 		text-align: start;
 		color: var(--ink);
 	}
 
-	.menu button[role='menuitem']:hover,
-	.menu button[role='menuitem']:focus-visible {
-		background: var(--ink-wash);
+	@media (hover: hover) and (pointer: fine) {
+		.menu button[role='menuitem']:hover {
+			background: var(--surface-tint);
+		}
 	}
 
-	.menu .danger {
-		color: var(--brick);
+	.menu button[role='menuitem']:focus-visible {
+		background: var(--surface-tint);
+	}
+
+	.menu hr {
+		block-size: var(--stroke-hairline);
+		margin: var(--space-1) var(--space-2);
+		border: 0;
+		background: var(--hairline);
+	}
+
+	.menu button.danger {
+		color: var(--danger);
 	}
 
 	.edit {
-		gap: var(--s-3);
-		padding: var(--s-3);
-	}
-
-	.edit label {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		font-size: 12px;
-		font-weight: 600;
-		letter-spacing: 0.04em;
-		color: var(--ink-2);
-	}
-
-	.edit input[type='number'],
-	.edit input[type='text'] {
-		min-block-size: 44px;
-		padding: 0 14px;
-		border: 1px solid var(--line);
-		border-radius: var(--r-pill);
-		background: var(--white);
-		font-size: 16px;
-		color: var(--ink);
-	}
-
-	.error {
-		font-size: 13px;
-		font-weight: 500;
-		color: var(--brick);
+		gap: var(--space-3);
+		padding: var(--space-3);
+		min-inline-size: 15rem;
 	}
 
 	.actions {
 		display: flex;
 		justify-content: flex-end;
-		gap: var(--s-2);
+		gap: var(--space-2);
 	}
 
-	.actions button {
-		min-block-size: 40px;
-		padding: 0 var(--s-4);
-		border: 1px solid transparent;
-		border-radius: var(--r-pill);
-		font-size: 14px;
-		font-weight: 500;
-	}
-
-	.cancel {
-		background: none;
-		border-color: var(--line);
-		color: var(--ink);
-	}
-
-	.save {
-		background: var(--dark);
-		color: var(--on-dark);
-	}
-
-	.save:disabled {
-		opacity: 0.4;
-	}
-
-	@media (max-width: 1023px) {
-		.more {
-			position: static;
-			flex: none;
-			inline-size: 44px;
-			block-size: 44px;
-			margin-inline-end: -10px;
-			background: none;
-			box-shadow: none;
-			opacity: 1;
+	/* a roomy slot (a stacked day) puts the servings under the title, beside the picture, with the button at the end */
+	@container slot (min-width: 17rem) {
+		.entry:not(.text) {
+			grid-template-areas: 'lead title act' 'lead meta act';
+			align-items: center;
 		}
-	}
 
-	@media (hover: none) {
-		.more {
-			opacity: 1;
+		.entry .more {
+			align-self: center;
 		}
 	}
 </style>

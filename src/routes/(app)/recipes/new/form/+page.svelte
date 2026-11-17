@@ -1,53 +1,25 @@
 <script lang="ts">
 	import RecipeForm from '#lib/recipes/RecipeForm.svelte';
-	import Kicker from '#lib/ui/Kicker.svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
+
+	// the page settles in on a full page load only
+	const settle = typeof document === 'undefined' || !document.documentElement.hasAttribute('data-hydrated');
 </script>
 
 <svelte:head>
 	<title>New recipe · Rues Cooking Hub</title>
 </svelte:head>
 
-<div class="column page" data-column>
-	<header class="enter" data-page-header>
-		<Kicker parts={['Recipes', 'New']} />
-		<h1>Write it <em>down</em></h1>
-	</header>
+<header class="screen-head">
+	<div class="screen-lead">
+		<ul class="kicker"><li>Recipes</li><li>New</li></ul>
+		<h1>Write it <em class="accent-word">down</em></h1>
+		<p class="lede">A title is all it needs. Everything else can be added later.</p>
+	</div>
+</header>
 
-	<RecipeForm draft={data.draft} tags={data.tags} errors={form?.errors} heading="The recipe" cancelHref="/recipes" />
+<div class="screen-body" data-settle={settle ? '' : undefined}>
+	<RecipeForm draft={data.draft} tags={data.tags} errors={form?.errors} heading="The recipe" cancelHref="/recipes" untitled="New recipe" keep restore />
 </div>
-
-<style>
-	.page {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-7);
-	}
-
-	h1 {
-		margin-block-start: var(--s-3);
-	}
-
-	h1 em {
-		color: var(--brick);
-	}
-
-	.enter {
-		animation: enter var(--d-slow) var(--ease-out) both;
-	}
-
-	@keyframes enter {
-		from {
-			opacity: 0;
-			transform: translateY(14px);
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.enter {
-			animation: none;
-		}
-	}
-</style>
